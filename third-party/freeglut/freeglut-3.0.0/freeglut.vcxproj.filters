@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\mswin\fg_cursor_mswin.c" />
+    <ClCompile Include="src\mswin\fg_display_mswin.c" />
+    <ClCompile Include="src\mswin\fg_ext_mswin.c" />
+    <ClCompile Include="src\mswin\fg_gamemode_mswin.c" />
+    <ClCompile Include="src\mswin\fg_init_mswin.c" />
+    <ClCompile Include="src\mswin\fg_input_devices_mswin.c" />
+    <ClCompile Include="src\mswin\fg_joystick_mswin.c" />
+    <ClCompile Include="src\mswin\fg_main_mswin.c" />
+    <ClCompile Include="src\mswin\fg_menu_mswin.c" />
+    <ClCompile Include="src\mswin\fg_spaceball_mswin.c" />
+    <ClCompile Include="src\mswin\fg_state_mswin.c" />
+    <ClCompile Include="src\mswin\fg_structure_mswin.c" />
+    <ClCompile Include="src\mswin\fg_window_mswin.c" />
+    <ClCompile Include="src\fg_callbacks.c" />
+    <ClCompile Include="src\fg_cursor.c" />
+    <ClCompile Include="src\fg_display.c" />
+    <ClCompile Include="src\fg_ext.c" />
+    <ClCompile Include="src\fg_font.c" />
+    <ClCompile Include="src\fg_font_data.c" />
+    <ClCompile Include="src\fg_gamemode.c" />
+    <ClCompile Include="src\fg_geometry.c" />
+    <ClCompile Include="src\fg_gl2.c" />
+    <ClCompile Include="src\fg_init.c" />
+    <ClCompile Include="src\fg_input_devices.c" />
+    <ClCompile Include="src\fg_joystick.c" />
+    <ClCompile Include="src\fg_main.c" />
+    <ClCompile Include="src\fg_menu.c" />
+    <ClCompile Include="src\fg_misc.c" />
+    <ClCompile Include="src\fg_overlay.c" />
+    <ClCompile Include="src\fg_spaceball.c" />
+    <ClCompile Include="src\fg_state.c" />
+    <ClCompile Include="src\fg_stroke_mono_roman.c" />
+    <ClCompile Include="src\fg_stroke_roman.c" />
+    <ClCompile Include="src\fg_structure.c" />
+    <ClCompile Include="src\fg_teapot.c" />
+    <ClCompile Include="src\fg_videoresize.c" />
+    <ClCompile Include="src\fg_window.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\mswin\fg_internal_mswin.h" />
+    <ClInclude Include="src\fg_gl2.h" />
+    <ClInclude Include="src\fg_init.h" />
+    <ClInclude Include="src\fg_internal.h" />
+    <ClInclude Include="src\fg_teapot_data.h" />
+    <ClInclude Include="src\fg_version.h" />
+    <ClInclude Include="include\GL\freeglut.h" />
+    <ClInclude Include="include\GL\freeglut_ext.h" />
+    <ClInclude Include="include\GL\freeglut_std.h" />
+    <ClInclude Include="include\GL\glut.h" />
+  </ItemGroup>
+</Project>
