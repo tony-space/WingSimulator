@@ -20,9 +20,9 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{A9E4DAC8-284F-4DF3-844C-07C9AAF2A573}</ProjectGuid>
+    <ProjectGuid>{7A47D388-367A-4E18-AA49-ED062905A4A6}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>freeglut</RootNamespace>
+    <RootNamespace>OpenGLRenderer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -30,27 +30,27 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -70,48 +70,46 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\glm\glm-0.9.9.5;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(SolutionDir)third-party\glm\glm-0.9.9.5;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(ProjectDir)include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\glm\glm-0.9.9.5;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(ProjectDir)include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\glm\glm-0.9.9.5;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NEED_XPARSEGEOMETRY_IMPL;FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NEED_XPARSEGEOMETRY_IMPL;FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -120,16 +118,15 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NEED_XPARSEGEOMETRY_IMPL;FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -140,16 +137,15 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NEED_XPARSEGEOMETRY_IMPL;FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FREEGLUT_LIB_PRAGMAS=0;FREEGLUT_STATIC;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -159,57 +155,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\fg_callbacks.c" />
-    <ClCompile Include="src\fg_cursor.c" />
-    <ClCompile Include="src\fg_display.c" />
-    <ClCompile Include="src\fg_ext.c" />
-    <ClCompile Include="src\fg_font.c" />
-    <ClCompile Include="src\fg_font_data.c" />
-    <ClCompile Include="src\fg_gamemode.c" />
-    <ClCompile Include="src\fg_geometry.c" />
-    <ClCompile Include="src\fg_gl2.c" />
-    <ClCompile Include="src\fg_init.c" />
-    <ClCompile Include="src\fg_input_devices.c" />
-    <ClCompile Include="src\fg_joystick.c" />
-    <ClCompile Include="src\fg_main.c" />
-    <ClCompile Include="src\fg_menu.c" />
-    <ClCompile Include="src\fg_misc.c" />
-    <ClCompile Include="src\fg_overlay.c" />
-    <ClCompile Include="src\fg_spaceball.c" />
-    <ClCompile Include="src\fg_state.c" />
-    <ClCompile Include="src\fg_stroke_mono_roman.c" />
-    <ClCompile Include="src\fg_stroke_roman.c" />
-    <ClCompile Include="src\fg_structure.c" />
-    <ClCompile Include="src\fg_teapot.c" />
-    <ClCompile Include="src\fg_videoresize.c" />
-    <ClCompile Include="src\fg_window.c" />
-    <ClCompile Include="src\mswin\fg_cursor_mswin.c" />
-    <ClCompile Include="src\mswin\fg_display_mswin.c" />
-    <ClCompile Include="src\mswin\fg_ext_mswin.c" />
-    <ClCompile Include="src\mswin\fg_gamemode_mswin.c" />
-    <ClCompile Include="src\mswin\fg_init_mswin.c" />
-    <ClCompile Include="src\mswin\fg_input_devices_mswin.c" />
-    <ClCompile Include="src\mswin\fg_joystick_mswin.c" />
-    <ClCompile Include="src\mswin\fg_main_mswin.c" />
-    <ClCompile Include="src\mswin\fg_menu_mswin.c" />
-    <ClCompile Include="src\mswin\fg_spaceball_mswin.c" />
-    <ClCompile Include="src\mswin\fg_state_mswin.c" />
-    <ClCompile Include="src\mswin\fg_structure_mswin.c" />
-    <ClCompile Include="src\mswin\fg_window_mswin.c" />
-    <ClCompile Include="src\util\xparsegeometry_repl.c" />
+    <ClInclude Include="COpenGLRenderer.hpp" />
+    <ClInclude Include="CShaderProgram.hpp" />
+    <ClInclude Include="pch.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\GL\freeglut.h" />
-    <ClInclude Include="include\GL\freeglut_ext.h" />
-    <ClInclude Include="include\GL\freeglut_std.h" />
-    <ClInclude Include="include\GL\glut.h" />
-    <ClInclude Include="src\fg_gl2.h" />
-    <ClInclude Include="src\fg_init.h" />
-    <ClInclude Include="src\fg_internal.h" />
-    <ClInclude Include="src\fg_teapot_data.h" />
-    <ClInclude Include="src\fg_version.h" />
-    <ClInclude Include="src\mswin\fg_internal_mswin.h" />
-    <ClInclude Include="src\util\xparsegeometry_repl.h" />
+    <ClCompile Include="COpenGLRenderer.cpp" />
+    <ClCompile Include="CShaderProgram.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

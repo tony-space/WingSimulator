@@ -38,6 +38,7 @@
     <ClCompile Include="src\fg_teapot.c" />
     <ClCompile Include="src\fg_videoresize.c" />
     <ClCompile Include="src\fg_window.c" />
+    <ClCompile Include="src\util\xparsegeometry_repl.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\mswin\fg_internal_mswin.h" />
@@ -50,5 +51,6 @@
     <ClInclude Include="include\GL\freeglut_ext.h" />
     <ClInclude Include="include\GL\freeglut_std.h" />
     <ClInclude Include="include\GL\glut.h" />
+    <ClInclude Include="src\util\xparsegeometry_repl.h" />
   </ItemGroup>
 </Project>

@@ -1,17 +1,21 @@
 #include "pch.hpp"
 #include "CSimulationCpu.hpp"
 
-std::unique_ptr<wing2d::ISimulation> wing2d::cpu::CreateSimulation()
+using namespace wing2d::simulation;
+using namespace wing2d::simulation::serialization;
+using namespace wing2d::simulation::cpu;
+
+std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 {
-	return std::make_unique<wing2d::cpu::CSimulationCpu>();
+	return std::make_unique<CSimulationCpu>();
 }
 
-void wing2d::cpu::CSimulationCpu::ResetState(const serialization::SimulationState& state)
+void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
 }
 
-float wing2d::cpu::CSimulationCpu::Update(float dt)
+float CSimulationCpu::Update(float dt)
 {
 	for (auto& p : m_state.particles)
 	{
@@ -21,7 +25,7 @@ float wing2d::cpu::CSimulationCpu::Update(float dt)
 	return dt;
 }
 
-void wing2d::cpu::CSimulationCpu::GetState(serialization::SimulationState& outState)
+void CSimulationCpu::GetState(SimulationState& outState)
 {
 	outState = m_state;
 }

@@ -8,3 +8,4 @@
 #include <glm/gtc/random.hpp>
 
 #include "../Simulation/Simulation.hpp"
+#include "../Rendering/Rendering.hpp"
