@@ -20,14 +20,11 @@ namespace wing2d
 			{
 				struct
 				{
-					float left = -1.0f;
-					float right = 1.0f;
+					float width = 2.0f;
+					float height = 2.0f;
+				} worldSize;
 
-					float bottom = -1.0f;
-					float top = 1.0f;
-				} worldBoundaries;
-
-				float particleRad;
+				float particleRad = 0.01f;
 				std::vector<Particle> particles;
 				std::vector<glm::vec2> wing;
 			};

@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <algorithm>
+#include <iostream>
+
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>
 
