@@ -96,62 +96,74 @@ static std::string ReadTextFile(const std::string& path)
 
 CShaderProgram::CShaderProgram(const std::string& vertexPath, const std::string& fragmentPath)
 {
-	m_program = glCreateProgram();
-	if (m_program == 0) throw std::runtime_error("glCreateProgram failed");
+	try
+	{
+		m_program = glCreateProgram();
+		if (m_program == 0) throw std::runtime_error("glCreateProgram failed");
 
-	auto status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glCreateProgram failed");
+		auto status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glCreateProgram failed");
 
-	auto vertexCode = ReadTextFile(vertexPath);
-	auto fragmentCode = ReadTextFile(fragmentPath);
+		auto vertexCode = ReadTextFile(vertexPath);
+		auto fragmentCode = ReadTextFile(fragmentPath);
 
-	CSmartShader vertexShader(GL_VERTEX_SHADER);
-	vertexShader.CompileSource(vertexCode);
+		CSmartShader vertexShader(GL_VERTEX_SHADER);
+		vertexShader.CompileSource(vertexCode);
 
-	CSmartShader fragmentShader(GL_FRAGMENT_SHADER);
-	fragmentShader.CompileSource(fragmentCode);
+		CSmartShader fragmentShader(GL_FRAGMENT_SHADER);
+		fragmentShader.CompileSource(fragmentCode);
 
-	glAttachShader(m_program, vertexShader);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glAttachShader failed");
+		glAttachShader(m_program, vertexShader);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glAttachShader failed");
 
-	glAttachShader(m_program, fragmentShader);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glAttachShader failed");
+		glAttachShader(m_program, fragmentShader);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glAttachShader failed");
 
-	glLinkProgram(m_program);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glLinkProgram failed");
+		glLinkProgram(m_program);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glLinkProgram failed");
 
-	GLint linkStatus;
-	glGetProgramiv(m_program, GL_LINK_STATUS, &linkStatus);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramiv failed");
+		GLint linkStatus;
+		glGetProgramiv(m_program, GL_LINK_STATUS, &linkStatus);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramiv failed");
 
-	char buffer[1024];
-	GLsizei logSize;
-	glGetProgramInfoLog(m_program, sizeof(buffer), &logSize, buffer);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramInfoLog failed");
-	printf("Program linking log:\r\n%s\r\n", buffer);
+		char buffer[1024];
+		GLsizei logSize;
+		glGetProgramInfoLog(m_program, sizeof(buffer), &logSize, buffer);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramInfoLog failed");
+		printf("Program linking log:\r\n%s\r\n", buffer);
 
-	if (!linkStatus) throw std::runtime_error("Linking failed. Check debug messages");
+		if (!linkStatus) throw std::runtime_error("Linking failed. Check debug messages");
 
-	glValidateProgram(m_program);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glValidateProgram failed");
+		glValidateProgram(m_program);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glValidateProgram failed");
 
-	GLint validationStatus;
-	glGetProgramiv(m_program, GL_VALIDATE_STATUS, &validationStatus);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramiv failed");
+		GLint validationStatus;
+		glGetProgramiv(m_program, GL_VALIDATE_STATUS, &validationStatus);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramiv failed");
 
-	glGetProgramInfoLog(m_program, sizeof(buffer), &logSize, buffer);
-	status = glGetError();
-	if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramInfoLog failed");
-	printf("Program validation log:\r\n%s\r\n", buffer);
+		glGetProgramInfoLog(m_program, sizeof(buffer), &logSize, buffer);
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glGetProgramInfoLog failed");
+		printf("Program validation log:\r\n%s\r\n", buffer);
 
-	if (!validationStatus) throw std::runtime_error("Validation failed. Check debug messages");
+		if (!validationStatus) throw std::runtime_error("Validation failed. Check debug messages");
+	}
+	catch (...)
+	{
+		if (m_program)
+		{
+			glDeleteProgram(m_program);
+			m_program = 0;
+		}
+		throw;
+	}
 }
 
 CShaderProgram::~CShaderProgram()
@@ -182,7 +194,7 @@ void CShaderProgram::SetUniform(const std::string& name, float value)
 	if (status != GL_NO_ERROR) throw std::runtime_error("glUniform1f failed");
 }
 
-void CShaderProgram::SetUniform(const std::string & name, const glm::vec3& value)
+void CShaderProgram::SetUniform(const std::string& name, const glm::vec3& value)
 {
 	GLenum status;
 	GLint location;

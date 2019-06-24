@@ -1,5 +1,6 @@
 #pragma once
 #include "../Rendering.hpp"
+#include "CShaderProgram.hpp"
 
 namespace wing2d
 {
@@ -19,8 +20,13 @@ namespace wing2d
 
 			private:
 				std::function<void()> m_onUpdate;
-				void InitScene();
+				GLuint m_vao;
+				GLuint m_vboPos;
+				GLuint m_vboColor;
 
+				std::unique_ptr<CShaderProgram> m_program;
+
+				void InitScene();
 
 				static COpenGLRenderer* instance;
 				static void DisplayFunc();

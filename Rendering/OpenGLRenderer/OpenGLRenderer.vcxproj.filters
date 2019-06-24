@@ -10,4 +10,17 @@
     <ClCompile Include="COpenGLRenderer.cpp" />
     <ClCompile Include="CShaderProgram.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\vertex.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\fragment.glsl">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{0cbe8e7e-fcfa-494c-8e55-6a30fcfab0e1}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
 </Project>

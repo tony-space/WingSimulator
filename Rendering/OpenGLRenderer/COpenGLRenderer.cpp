@@ -31,30 +31,78 @@ void COpenGLRenderer::SetOnUpdate(std::function<void()> onUpdate)
 
 void COpenGLRenderer::RenderAsync(const SimulationState& state)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT*/);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	for (const auto p : state.particles)
+	std::vector<glm::vec2> positions(state.particles.size());
+	std::vector<glm::vec4> colors(state.particles.size());
+
+	std::transform(state.particles.begin(), state.particles.end(), positions.begin(), [](const auto& p)
 	{
-		glPushMatrix();
-		glTranslatef(p.pos.x, p.pos.y, 0.0f);
-		glutWireCube(state.particleRad);
-		glPopMatrix();
+		return p.pos;
+	});
+
+	std::transform(state.particles.begin(), state.particles.end(), colors.begin(), [](const auto& p)
+	{
+		return glm::vec4((p.pos + glm::vec2(1.0f)) * 0.5f, 1.0f, 1.0f);
+	});
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * colors.size(), colors.data(), GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	{
+		glBindVertexArray(m_vao);
+		auto switcher = m_program->Activate();
+		m_program->SetUniform("radius", 3);
+		glDrawArrays(GL_POINTS, 0, state.particles.size());
+		glBindVertexArray(0);
 	}
 
 	glFlush();
+
+	assert(glGetError() == GL_NO_ERROR);
 }
 
 void COpenGLRenderer::InitScene()
 {
-	glEnable(GL_DEPTH_TEST);
+	GLenum glError;
+
+	//glEnable(GL_DEPTH_TEST);
 
 	//See the link below to read more  about GL_POINT_SPRITE_ARB
 	//https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_point_sprite.txt
 	glEnable(GL_POINT_SPRITE);
 	glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+
+	m_program = std::make_unique<CShaderProgram>("shaders/vertex.glsl", "shaders/fragment.glsl");
+	auto posLocation = m_program->GetAttributeLocation("pos");
+	auto colorLocation = m_program->GetAttributeLocation("color");
+
+	glGenVertexArrays(1, &m_vao);
+	glGenBuffers(1, &m_vboPos);
+	glGenBuffers(1, &m_vboColor);
+
+	glBindVertexArray(m_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
+	glEnableVertexAttribArray(posLocation);
+	glVertexAttribPointer(posLocation, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
+	glEnableVertexAttribArray(colorLocation);
+	glVertexAttribPointer(colorLocation, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	glError = glGetError();
+	assert(glError == GL_NO_ERROR);
 }
 
 void COpenGLRenderer::DisplayFunc()
@@ -78,6 +126,11 @@ void COpenGLRenderer::ReshapeFunc(int w, int h)
 
 void COpenGLRenderer::CloseFunc()
 {
+	glDeleteBuffers(1, &instance->m_vboPos);
+	glDeleteBuffers(1, &instance->m_vboColor);
+	glDeleteVertexArrays(1, &instance->m_vao);
+
+	assert(glGetError() == GL_NO_ERROR);
 }
 
 void COpenGLRenderer::InitWindowLoop(size_t width, size_t height, bool fullscreen /*= false*/)
@@ -85,9 +138,9 @@ void COpenGLRenderer::InitWindowLoop(size_t width, size_t height, bool fullscree
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 
 	if (fullscreen)
-		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
+		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE /*| GLUT_DEPTH*/ | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
 	else
-		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
+		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE /*| GLUT_DEPTH*/);
 
 	glutInitWindowSize(int(width), int(height));
 
