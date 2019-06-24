@@ -12,7 +12,6 @@ COpenGLRenderer* COpenGLRenderer::instance = nullptr;
 std::unique_ptr<IRenderer> wing2d::rendering::opengl::CreateRenderer(int argc, char** argv)
 {
 	glutInit(&argc, argv);
-	//glewInit();
 	return std::make_unique<COpenGLRenderer>();
 }
 
@@ -27,46 +26,6 @@ COpenGLRenderer::COpenGLRenderer()
 void COpenGLRenderer::SetOnUpdate(std::function<void()> onUpdate)
 {
 	m_onUpdate = onUpdate;
-}
-
-void COpenGLRenderer::RenderAsync(const SimulationState& state)
-{
-	glClear(GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT*/);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	std::vector<glm::vec2> positions(state.particles.size());
-	std::vector<glm::vec4> colors(state.particles.size());
-
-	std::transform(state.particles.begin(), state.particles.end(), positions.begin(), [](const auto& p)
-	{
-		return p.pos;
-	});
-
-	std::transform(state.particles.begin(), state.particles.end(), colors.begin(), [](const auto& p)
-	{
-		return glm::vec4((p.pos + glm::vec2(1.0f)) * 0.5f, 1.0f, 1.0f);
-	});
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * colors.size(), colors.data(), GL_DYNAMIC_DRAW);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	{
-		glBindVertexArray(m_vao);
-		auto switcher = m_program->Activate();
-		m_program->SetUniform("radius", 3);
-		glDrawArrays(GL_POINTS, 0, state.particles.size());
-		glBindVertexArray(0);
-	}
-
-	glFlush();
-
-	assert(glGetError() == GL_NO_ERROR);
 }
 
 void COpenGLRenderer::InitScene()
@@ -105,6 +64,16 @@ void COpenGLRenderer::InitScene()
 	assert(glError == GL_NO_ERROR);
 }
 
+void COpenGLRenderer::CloseFunc()
+{
+	glDeleteBuffers(1, &instance->m_vboPos);
+	glDeleteBuffers(1, &instance->m_vboColor);
+	glDeleteVertexArrays(1, &instance->m_vao);
+	instance->m_program.reset();
+
+	assert(glGetError() == GL_NO_ERROR);
+}
+
 void COpenGLRenderer::DisplayFunc()
 {
 	instance->m_onUpdate();
@@ -112,6 +81,47 @@ void COpenGLRenderer::DisplayFunc()
 	glutSwapBuffers();
 	glutPostRedisplay();
 	glutReportErrors();
+}
+
+void COpenGLRenderer::RenderAsync(const SimulationState& state)
+{
+	glClear(GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT*/);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	std::vector<glm::vec2> positions(state.particles.size());
+	std::vector<glm::vec4> colors(state.particles.size());
+
+	std::transform(state.particles.begin(), state.particles.end(), positions.begin(), [](const auto& p)
+	{
+		return p.pos;
+	});
+
+	std::transform(state.particles.begin(), state.particles.end(), colors.begin(), [](const auto& p)
+	{
+		return glm::vec4((p.pos + glm::vec2(1.0f)) * 0.5f, 0.0f, 1.0f);
+	});
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * colors.size(), colors.data(), GL_DYNAMIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	{
+		glBindVertexArray(m_vao);
+		auto switcher = m_program->Activate();
+
+		float pixelsPerUnit = m_window.y * 0.5f;
+
+		m_program->SetUniform("radius", state.particleRad * pixelsPerUnit * 2.0f);
+		glDrawArrays(GL_POINTS, 0, GLsizei(state.particles.size()));
+		glBindVertexArray(0);
+	}
+	glutWireCube(2.0);
+	glFlush();
+	assert(glGetError() == GL_NO_ERROR);
 }
 
 void COpenGLRenderer::ReshapeFunc(int w, int h)
@@ -122,15 +132,8 @@ void COpenGLRenderer::ReshapeFunc(int w, int h)
 
 	GLdouble aspectRatio = GLdouble(w) / h;
 	glOrtho(-aspectRatio, aspectRatio, -1.0, 1.0, -1.0, 1.0);
-}
 
-void COpenGLRenderer::CloseFunc()
-{
-	glDeleteBuffers(1, &instance->m_vboPos);
-	glDeleteBuffers(1, &instance->m_vboColor);
-	glDeleteVertexArrays(1, &instance->m_vao);
-
-	assert(glGetError() == GL_NO_ERROR);
+	instance->m_window = glm::vec3(w, h, aspectRatio);
 }
 
 void COpenGLRenderer::InitWindowLoop(size_t width, size_t height, bool fullscreen /*= false*/)

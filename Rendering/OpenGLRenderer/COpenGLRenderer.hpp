@@ -23,8 +23,10 @@ namespace wing2d
 				GLuint m_vao;
 				GLuint m_vboPos;
 				GLuint m_vboColor;
-
 				std::unique_ptr<CShaderProgram> m_program;
+
+				//x - width, y - height, z - aspect ratio
+				glm::vec3 m_window;
 
 				void InitScene();
 

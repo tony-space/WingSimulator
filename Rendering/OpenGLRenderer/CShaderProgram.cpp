@@ -66,6 +66,8 @@ public:
 	{
 		glDeleteShader(m_shader);
 		auto status = glGetError();
+		
+		assert(status == GL_NO_ERROR);
 		if (status != GL_NO_ERROR) fprintf(stderr, "glDeleteShader failed\r\n");
 	}
 
@@ -170,6 +172,7 @@ CShaderProgram::~CShaderProgram()
 {
 	glDeleteProgram(m_program);
 	auto status = glGetError();
+	assert(status == GL_NO_ERROR);
 	if (status != GL_NO_ERROR) fprintf(stderr, "glDeleteProgram failed\r\n");
 }
 
