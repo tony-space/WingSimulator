@@ -12,6 +12,7 @@
 #include <GL/freeglut.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "../../Simulation/Simulation.hpp"
 #include "../Rendering.hpp"

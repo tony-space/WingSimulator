@@ -23,6 +23,11 @@ COpenGLRenderer::COpenGLRenderer()
 	instance = this;
 }
 
+COpenGLRenderer::~COpenGLRenderer()
+{
+	instance = nullptr;
+}
+
 void COpenGLRenderer::SetOnUpdate(std::function<void()> onUpdate)
 {
 	m_onUpdate = onUpdate;
@@ -85,7 +90,7 @@ void COpenGLRenderer::DisplayFunc()
 
 void COpenGLRenderer::RenderAsync(const SimulationState& state)
 {
-	glClear(GL_COLOR_BUFFER_BIT/* | GL_DEPTH_BUFFER_BIT*/);
+	glClear(GL_COLOR_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
@@ -119,7 +124,12 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 		glDrawArrays(GL_POINTS, 0, GLsizei(state.particles.size()));
 		glBindVertexArray(0);
 	}
-	glutWireCube(2.0);
+
+	glBegin(GL_LINE_LOOP);
+	for (const auto& v : state.wing)
+		glVertex2fv(glm::value_ptr(v));
+	glEnd();
+
 	glFlush();
 	assert(glGetError() == GL_NO_ERROR);
 }
@@ -141,9 +151,9 @@ void COpenGLRenderer::InitWindowLoop(size_t width, size_t height, bool fullscree
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 
 	if (fullscreen)
-		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE /*| GLUT_DEPTH*/ | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
+		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
 	else
-		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE /*| GLUT_DEPTH*/);
+		glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
 
 	glutInitWindowSize(int(width), int(height));
 

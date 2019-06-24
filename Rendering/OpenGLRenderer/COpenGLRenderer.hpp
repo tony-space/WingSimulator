@@ -12,7 +12,7 @@ namespace wing2d
 			{
 			public:
 				COpenGLRenderer();
-				virtual ~COpenGLRenderer() override = default;
+				virtual ~COpenGLRenderer() override;
 
 				virtual void SetOnUpdate(std::function<void()> onUpdate) override;
 				virtual void RenderAsync(const simulation::serialization::SimulationState& state) override;

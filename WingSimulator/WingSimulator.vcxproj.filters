@@ -7,4 +7,14 @@
   <ItemGroup>
     <ClInclude Include="pch.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Filter Include="airfoils">
+      <UniqueIdentifier>{8a04f9a9-e3df-4fb5-a3c1-5204ba597387}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="airfoils\e398.dat">
+      <Filter>airfoils</Filter>
+    </CopyFileToFolders>
+  </ItemGroup>
 </Project>
