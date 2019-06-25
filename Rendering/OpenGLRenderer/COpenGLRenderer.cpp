@@ -38,6 +38,7 @@ void COpenGLRenderer::InitScene()
 	GLenum glError;
 
 	//glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_CULL_FACE);
 
 	//See the link below to read more  about GL_POINT_SPRITE_ARB
 	//https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_point_sprite.txt
@@ -104,7 +105,7 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 
 	std::transform(state.particles.begin(), state.particles.end(), colors.begin(), [](const auto& p)
 	{
-		return glm::vec4((p.pos + glm::vec2(1.0f)) * 0.5f, 0.0f, 1.0f);
+		return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
 	});
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
@@ -126,6 +127,7 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 	}
 
 	glBegin(GL_LINE_LOOP);
+	//glBegin(GL_TRIANGLE_FAN);
 	for (const auto& v : state.wing)
 		glVertex2fv(glm::value_ptr(v));
 	glEnd();

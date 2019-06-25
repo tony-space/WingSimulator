@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 1024;
+constexpr size_t kParticles = 64;
 
 class CSmartFile
 {
@@ -53,7 +53,12 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 	std::deque<glm::vec2> result;
 	std::generate_n(std::back_inserter(result), vertices1, vertexParser);
 	std::generate_n(std::front_inserter(result), vertices2, vertexParser);
-	return std::vector(result.begin(), result.end());
+	//return std::vector(result.rbegin(), result.rend());
+	return std::vector<glm::vec2>({
+		glm::vec2(-0.5f, -0.5f),
+		glm::vec2(0.5f, -0.5f),
+		glm::vec2(0.5f, 0.5f),
+		glm::vec2(-0.5f, 0.5f) });
 }
 
 int main(int argc, char** argv)
