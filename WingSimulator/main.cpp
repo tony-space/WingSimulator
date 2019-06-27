@@ -25,7 +25,7 @@ private:
 	FILE* m_pFile;
 };
 
-std::vector<glm::vec2> LoadAirfoil(const char* path)
+wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char* path)
 {
 	CSmartFile pFile(path);
 
@@ -45,20 +45,48 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 	auto vertexParser = [&]()
 	{
 		glm::vec2 result;
-		if(fscanf(pFile, "%f %f", &result.x, &result.y) != 2)
+		if (fscanf(pFile, "%f %f", &result.x, &result.y) != 2)
 			throw std::runtime_error("Couldn't read the next vertex of airfoil");
 		return result;
 	};
 
-	std::deque<glm::vec2> result;
-	std::generate_n(std::back_inserter(result), vertices1, vertexParser);
-	std::generate_n(std::front_inserter(result), vertices2, vertexParser);
-	//return std::vector(result.rbegin(), result.rend());
-	return std::vector<glm::vec2>({
-		glm::vec2(-0.5f, -0.5f),
-		glm::vec2(0.5f, -0.5f),
-		glm::vec2(0.5f, 0.5f),
-		glm::vec2(-0.5f, 0.5f) });
+	using namespace wing2d::simulation::serialization;
+	SimulationState::SWing wing;
+
+	{
+		std::deque<glm::vec2> deque;
+		std::generate_n(std::back_inserter(deque), vertices1, vertexParser);
+		std::generate_n(std::front_inserter(deque), vertices2, vertexParser);
+		wing.airfoil.reserve(deque.size());
+		std::copy(deque.cbegin(), deque.cend(), std::back_inserter(wing.airfoil));
+	}
+
+	std::transform(wing.airfoil.cbegin(), wing.airfoil.cend(), wing.airfoil.begin(), [](const auto& v) {return v * 3.0f - glm::vec2(1.25f, 0.0f); });
+
+	/*wing.airfoil = std::vector<glm::vec2>({
+			glm::vec2(-0.5f, -0.5f),
+			glm::vec2(0.5f, -0.5f),
+			glm::vec2(0.5f, 0.5f),
+			glm::vec2(-0.5f, 0.5f) });*/
+
+	{
+		std::vector<std::pair<float, float>> curve;
+		boost::push_back(curve, wing.airfoil | boost::adaptors::transformed([](const auto& v) {return std::make_pair(v.x, v.y); }));
+
+		std::vector<decltype(curve)> curves = { curve };
+		auto indices = mapbox::earcut<uint16_t>(curves);
+		wing.triangles.reserve(indices.size() / 3);
+		boost::push_back(wing.triangles, indices | boost::adaptors::strided(3) | boost::adaptors::transformed([](const auto& index)
+		{
+			using namespace wing2d::simulation::serialization;
+			SimulationState::SWing::STriangle t;
+			t.i1 = index;
+			t.i2 = *(&index + 1);
+			t.i3 = *(&index + 2);
+			return t;
+		}));
+	}
+	return std::move(wing);
 }
 
 int main(int argc, char** argv)
@@ -85,7 +113,7 @@ int main(int argc, char** argv)
 			return p;
 		});
 		state.worldSize.width = (4.0f / 3.0f) * 2.0f;
-		state.wing = LoadAirfoil(argv[1]);
+		state.wing = std::move(LoadAirfoil(argv[1]));
 
 		simulation->ResetState(state);
 

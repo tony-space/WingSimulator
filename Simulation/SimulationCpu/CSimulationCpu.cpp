@@ -10,41 +10,40 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 	return std::make_unique<CSimulationCpu>();
 }
 
-CSimulationCpu::SLine::SLine(const glm::vec2& v1, const glm::vec2& v2)
-{
-	auto dt = v2 - v1;
-
-	origin = v1;
-	length = glm::length(dt);
-	if (length < 1e-16f)
-		length = 0.0f;
-
-	ray = length > 0.0f ? dt / length : glm::vec2(0.0f);
-	normal = glm::vec2(ray.y, -ray.x);
-}
-
-
-bool CSimulationCpu::SLine::Intersected(const glm::vec2& spherePos, float sphereRad, glm::vec2& contactNorm, float& outDepth)
-{
-	//auto toSphereCenter = spherePos - origin;
-
-	//if (length == 0.0f)
-	//{
-	//	auto distanceToSphere = glm::length(toSphereCenter);
-	//	//if(distanceToSphere)
-	//}
-
-	//auto spherePosProj = glm::dot(C, ray);
-
-	return false;
-}
+//CSimulationCpu::SLine::SLine(const glm::vec2& v1, const glm::vec2& v2)
+//{
+//	auto dt = v2 - v1;
+//
+//	origin = v1;
+//	length = glm::length(dt);
+//	if (length < 1e-16f)
+//		length = 0.0f;
+//
+//	ray = length > 0.0f ? dt / length : glm::vec2(0.0f);
+//	normal = glm::vec2(ray.y, -ray.x);
+//}
+//
+//
+//bool CSimulationCpu::SLine::Intersected(const glm::vec2& spherePos, float sphereRad, glm::vec2& contactNorm, float& outDepth)
+//{
+//	//auto toSphereCenter = spherePos - origin;
+//
+//	//if (length == 0.0f)
+//	//{
+//	//	auto distanceToSphere = glm::length(toSphereCenter);
+//	//	//if(distanceToSphere)
+//	//}
+//
+//	//auto spherePosProj = glm::dot(C, ray);
+//
+//	return false;
+//}
 
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
 
-	m_lines.resize(0);
-	m_lines.reserve(state.wing.size());
+	//m_lines.resize(0);
 
 }
 

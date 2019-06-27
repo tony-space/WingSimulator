@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <memory>
+#include <cstdint>
 #include <glm/vec2.hpp>
 
 namespace wing2d
@@ -26,7 +27,19 @@ namespace wing2d
 
 				float particleRad = 0.01f;
 				std::vector<Particle> particles;
-				std::vector<glm::vec2> wing;
+				struct SWing
+				{
+					struct STriangle
+					{
+						using value_type = uint16_t;
+						value_type i1;
+						value_type i2;
+						value_type i3;
+					};
+
+					std::vector<glm::vec2> airfoil;
+					std::vector<STriangle> triangles;
+				} wing;
 			};
 		}
 

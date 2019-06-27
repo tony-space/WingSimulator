@@ -126,11 +126,27 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 		glBindVertexArray(0);
 	}
 
+	glColor3f(0.0f, 1.0, 0.0f);
+	glBegin(GL_LINES);
+	for (const auto& t : state.wing.triangles)
+	{
+		glVertex2fv(glm::value_ptr(state.wing.airfoil[t.i1]));
+		glVertex2fv(glm::value_ptr(state.wing.airfoil[t.i2]));
+
+		glVertex2fv(glm::value_ptr(state.wing.airfoil[t.i2]));
+		glVertex2fv(glm::value_ptr(state.wing.airfoil[t.i3]));
+
+		glVertex2fv(glm::value_ptr(state.wing.airfoil[t.i3]));
+		glVertex2fv(glm::value_ptr(state.wing.airfoil[t.i1]));
+	}
+	glEnd();
+
+	glColor3f(1.0f, 1.0, 1.0f);
 	glBegin(GL_LINE_LOOP);
-	//glBegin(GL_TRIANGLE_FAN);
-	for (const auto& v : state.wing)
+	for (const auto& v : state.wing.airfoil)
 		glVertex2fv(glm::value_ptr(v));
 	glEnd();
+
 
 	glFlush();
 	assert(glGetError() == GL_NO_ERROR);

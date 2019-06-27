@@ -7,8 +7,11 @@
 
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>
+#include <boost/range/algorithm_ext.hpp>
 
 #include <glm/gtc/random.hpp>
+
+#include <earcut.hpp>
 
 #include "../Simulation/Simulation.hpp"
 #include "../Rendering/Rendering.hpp"
