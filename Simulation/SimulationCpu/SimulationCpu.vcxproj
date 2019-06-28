@@ -155,11 +155,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CBoundingBox.hpp" />
+    <ClInclude Include="CLine.hpp" />
+    <ClInclude Include="CMesh.hpp" />
     <ClInclude Include="CSimulationCpu.hpp" />
+    <ClInclude Include="CTriangle.hpp" />
     <ClInclude Include="pch.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CBoundingBox.cpp" />
+    <ClCompile Include="CLine.cpp" />
+    <ClCompile Include="CMesh.cpp" />
     <ClCompile Include="CSimulationCpu.cpp" />
+    <ClCompile Include="CTriangle.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

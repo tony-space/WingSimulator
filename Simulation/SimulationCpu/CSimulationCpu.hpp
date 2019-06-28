@@ -13,7 +13,7 @@ namespace wing2d
 				virtual ~CSimulationCpu() override = default;
 				virtual void ResetState(const serialization::SimulationState& state) override;
 				virtual float Update(float dt) override;
-				virtual void GetState(serialization::SimulationState& outState) override;
+				virtual const serialization::SimulationState& GetState() override;
 			private:
 				wing2d::simulation::serialization::SimulationState m_state;
 

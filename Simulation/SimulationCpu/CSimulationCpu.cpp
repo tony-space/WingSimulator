@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "CSimulationCpu.hpp"
+#include "CBoundingBox.hpp"
 
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::serialization;
@@ -43,8 +44,8 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
 
-	//m_lines.resize(0);
-
+	CBoundingBox box;
+	box.AddPoints(state.wing.airfoil);
 }
 
 float CSimulationCpu::Update(float dt)
@@ -86,7 +87,7 @@ float CSimulationCpu::Update(float dt)
 	return dt;
 }
 
-void CSimulationCpu::GetState(SimulationState& outState)
+const serialization::SimulationState& CSimulationCpu::GetState()
 {
-	outState = m_state;
+	return m_state;
 }

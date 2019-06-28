@@ -47,7 +47,7 @@ namespace wing2d
 		{
 			virtual void ResetState(const serialization::SimulationState& state) = 0;
 			virtual float Update(float dt) = 0;
-			virtual void GetState(serialization::SimulationState& outState) = 0;
+			virtual const serialization::SimulationState& GetState() = 0;
 			virtual ~ISimulation() = default;
 		};
 

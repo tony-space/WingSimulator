@@ -89,6 +89,25 @@ wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char
 	return std::move(wing);
 }
 
+void SetupState(wing2d::simulation::ISimulation* simulation, wing2d::simulation::serialization::SimulationState::SWing&& wing)
+{
+	wing2d::simulation::serialization::SimulationState state;
+
+	state.particles.reserve(kParticles);
+	std::generate_n(std::back_inserter(state.particles), kParticles, []()
+	{
+		wing2d::simulation::serialization::Particle p;
+		p.pos = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
+		p.vel = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
+
+		return p;
+	});
+	state.worldSize.width = (4.0f / 3.0f) * 2.0f;
+	state.wing = std::move(wing);
+
+	simulation->ResetState(state);
+}
+
 int main(int argc, char** argv)
 {
 	try
@@ -101,26 +120,11 @@ int main(int argc, char** argv)
 		auto renderer = wing2d::rendering::opengl::CreateRenderer(argc, argv);
 		auto simulation = wing2d::simulation::cpu::CreateSimulation();
 
-		wing2d::simulation::serialization::SimulationState state;
-
-		state.particles.reserve(kParticles);
-		std::generate_n(std::back_inserter(state.particles), kParticles, []()
-		{
-			wing2d::simulation::serialization::Particle p;
-			p.pos = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
-			p.vel = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
-
-			return p;
-		});
-		state.worldSize.width = (4.0f / 3.0f) * 2.0f;
-		state.wing = std::move(LoadAirfoil(argv[1]));
-
-		simulation->ResetState(state);
+		SetupState(simulation.get(), LoadAirfoil(argv[1]));
 
 		renderer->SetOnUpdate([&]()
 		{
-			simulation->GetState(state);
-			renderer->RenderAsync(state);
+			renderer->RenderAsync(simulation->GetState());
 			float t = simulation->Update(0.0001f);
 		});
 

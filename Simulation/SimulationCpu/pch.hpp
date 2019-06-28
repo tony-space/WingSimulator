@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <memory>
+#include <cfloat>
 
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>
