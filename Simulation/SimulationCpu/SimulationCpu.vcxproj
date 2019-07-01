@@ -156,16 +156,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CBoundingBox.hpp" />
-    <ClInclude Include="CLine.hpp" />
-    <ClInclude Include="CMesh.hpp" />
+    <ClInclude Include="CLineSegment.hpp" />
     <ClInclude Include="CSimulationCpu.hpp" />
     <ClInclude Include="CTriangle.hpp" />
     <ClInclude Include="pch.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CBoundingBox.cpp" />
-    <ClCompile Include="CLine.cpp" />
-    <ClCompile Include="CMesh.cpp" />
+    <ClCompile Include="CLineSegment.cpp" />
     <ClCompile Include="CSimulationCpu.cpp" />
     <ClCompile Include="CTriangle.cpp" />
     <ClCompile Include="pch.cpp">

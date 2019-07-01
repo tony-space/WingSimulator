@@ -6,6 +6,7 @@
 
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>
+#include <boost/range/algorithm_ext.hpp>
 
 #include <glm/glm.hpp>
 

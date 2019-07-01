@@ -4,16 +4,14 @@
     <ClInclude Include="CSimulationCpu.hpp" />
     <ClInclude Include="pch.hpp" />
     <ClInclude Include="CBoundingBox.hpp" />
-    <ClInclude Include="CLine.hpp" />
     <ClInclude Include="CTriangle.hpp" />
-    <ClInclude Include="CMesh.hpp" />
+    <ClInclude Include="CLineSegment.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CSimulationCpu.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="CBoundingBox.cpp" />
-    <ClCompile Include="CLine.cpp" />
     <ClCompile Include="CTriangle.cpp" />
-    <ClCompile Include="CMesh.cpp" />
+    <ClCompile Include="CLineSegment.cpp" />
   </ItemGroup>
 </Project>

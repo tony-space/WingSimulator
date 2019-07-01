@@ -61,7 +61,7 @@ wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char
 		std::copy(deque.cbegin(), deque.cend(), std::back_inserter(wing.airfoil));
 	}
 
-	std::transform(wing.airfoil.cbegin(), wing.airfoil.cend(), wing.airfoil.begin(), [](const auto& v) {return v * 3.0f - glm::vec2(1.25f, 0.0f); });
+	//std::transform(wing.airfoil.cbegin(), wing.airfoil.cend(), wing.airfoil.begin(), [](const auto& v) {return v * 3.0f - glm::vec2(1.25f, 0.0f); });
 
 	/*wing.airfoil = std::vector<glm::vec2>({
 			glm::vec2(-0.5f, -0.5f),
@@ -86,7 +86,7 @@ wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char
 			return t;
 		}));
 	}
-	return std::move(wing);
+	return wing;
 }
 
 void SetupState(wing2d::simulation::ISimulation* simulation, wing2d::simulation::serialization::SimulationState::SWing&& wing)

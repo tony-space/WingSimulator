@@ -11,41 +11,23 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 	return std::make_unique<CSimulationCpu>();
 }
 
-//CSimulationCpu::SLine::SLine(const glm::vec2& v1, const glm::vec2& v2)
-//{
-//	auto dt = v2 - v1;
-//
-//	origin = v1;
-//	length = glm::length(dt);
-//	if (length < 1e-16f)
-//		length = 0.0f;
-//
-//	ray = length > 0.0f ? dt / length : glm::vec2(0.0f);
-//	normal = glm::vec2(ray.y, -ray.x);
-//}
-//
-//
-//bool CSimulationCpu::SLine::Intersected(const glm::vec2& spherePos, float sphereRad, glm::vec2& contactNorm, float& outDepth)
-//{
-//	//auto toSphereCenter = spherePos - origin;
-//
-//	//if (length == 0.0f)
-//	//{
-//	//	auto distanceToSphere = glm::length(toSphereCenter);
-//	//	//if(distanceToSphere)
-//	//}
-//
-//	//auto spherePosProj = glm::dot(C, ray);
-//
-//	return false;
-//}
-
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
 
-	CBoundingBox box;
-	box.AddPoints(state.wing.airfoil);
+	m_wing.clear();
+	m_wing.reserve(state.wing.triangles.size());
+
+	auto range = state.wing.triangles | boost::adaptors::transformed([&](const auto& t)
+	{
+		const glm::vec2& a = state.wing.airfoil[t.i1];
+		const glm::vec2& b = state.wing.airfoil[t.i2];
+		const glm::vec2& c = state.wing.airfoil[t.i3];
+
+		return CTriangle(a, b, c);
+	});
+
+	boost::range::push_back(m_wing, range);
 }
 
 float CSimulationCpu::Update(float dt)
@@ -55,7 +37,7 @@ float CSimulationCpu::Update(float dt)
 
 	float bottom = -m_state.worldSize.height * 0.5f;
 	float top = m_state.worldSize.height * 0.5f;
-	
+
 	for (auto& p : m_state.particles)
 	{
 		p.pos += p.vel * dt;
