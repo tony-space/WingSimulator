@@ -17,3 +17,12 @@ CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b)
 
 	m_normal = glm::vec2(m_ray.y, -m_ray.x);
 }
+
+float CLineSegment::DistanceToLine(const glm::vec2& pos) const
+{
+	auto dirToCenter = pos - m_origin;
+	auto centerProj = glm::dot(dirToCenter, m_ray);
+	auto isUp = glm::sign(glm::dot(dirToCenter, m_normal));
+
+	return isUp * glm::sqrt(glm::dot(dirToCenter, dirToCenter) - centerProj * centerProj);
+}

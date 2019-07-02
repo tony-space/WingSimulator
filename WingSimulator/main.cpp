@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 		renderer->SetOnUpdate([&]()
 		{
 			renderer->RenderAsync(simulation->GetState());
-			float t = simulation->Update(0.0001f);
+			float t = simulation->Update();
 		});
 
 		renderer->InitWindowLoop(800, 600, false);

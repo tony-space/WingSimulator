@@ -15,6 +15,37 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
 
+	BuildWing(state);
+	BuildWalls(state);
+}
+
+float CSimulationCpu::Update()
+{
+	constexpr float dt = 0.0001f;
+
+	for (auto& p : m_state.particles)
+	{
+		p.pos += p.vel * dt;
+
+		for (const auto& w : m_walls)
+		{
+			auto distance = w.DistanceToLine(p.pos) - m_state.particleRad;
+			if (distance <= 0.0f && glm::dot(p.vel, w.normal()) < 0.0f)
+				p.vel = glm::reflect(p.vel, w.normal());
+		}
+	}
+
+
+	return dt;
+}
+
+const serialization::SimulationState& CSimulationCpu::GetState()
+{
+	return m_state;
+}
+
+void CSimulationCpu::BuildWing(const SimulationState &state)
+{
 	m_wing.clear();
 	m_wing.reserve(state.wing.triangles.size());
 
@@ -30,46 +61,18 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 	boost::range::push_back(m_wing, range);
 }
 
-float CSimulationCpu::Update(float dt)
+void CSimulationCpu::BuildWalls(const SimulationState &state)
 {
-	float left = -m_state.worldSize.width * 0.5f;
-	float right = m_state.worldSize.width * 0.5f;
+	glm::vec2 corner(state.worldSize.width / 2.0f, state.worldSize.height / 2.0f);
+	glm::vec2 topLeft(-corner.x, corner.y);
+	glm::vec2 topRight(corner.x, corner.y);
+	glm::vec2 bottomRight(corner.x, -corner.y);
+	glm::vec2 bottomLeft(-corner.x, -corner.y);
 
-	float bottom = -m_state.worldSize.height * 0.5f;
-	float top = m_state.worldSize.height * 0.5f;
-
-	for (auto& p : m_state.particles)
-	{
-		p.pos += p.vel * dt;
-		if (p.pos.x + m_state.particleRad > right)
-		{
-			p.pos.x = right - m_state.particleRad;
-			p.vel.x = -glm::abs(p.vel.x);
-		}
-
-		if (p.pos.x - m_state.particleRad < left)
-		{
-			p.pos.x = left + m_state.particleRad;
-			p.vel.x = glm::abs(p.vel.x);
-		}
-
-		if (p.pos.y + m_state.particleRad > top)
-		{
-			p.pos.y = top - m_state.particleRad;
-			p.vel.y = -glm::abs(p.vel.y);
-		}
-
-		if (p.pos.y - m_state.particleRad < bottom)
-		{
-			p.pos.y = bottom + m_state.particleRad;
-			p.vel.y = glm::abs(p.vel.y);
-		}
-	}
-
-	return dt;
-}
-
-const serialization::SimulationState& CSimulationCpu::GetState()
-{
-	return m_state;
+	m_walls.clear();
+	m_walls.reserve(4);
+	m_walls.emplace_back(topLeft, topRight);
+	m_walls.emplace_back(topRight, bottomRight);
+	m_walls.emplace_back(bottomRight, bottomLeft);
+	m_walls.emplace_back(bottomLeft, topLeft);
 }
