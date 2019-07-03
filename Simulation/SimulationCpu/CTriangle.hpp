@@ -18,6 +18,8 @@ namespace wing2d
 			{
 			public:
 				CTriangle(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c);
+
+				bool IsIntersected(const glm::vec2& pos, float rad, glm::vec2& outNormal, float& outDepth) const;
 			private:
 				CBoundingBox m_box;
 

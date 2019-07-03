@@ -13,6 +13,7 @@ namespace wing2d
 			public:
 				CBoundingBox();
 				void AddPoint(const glm::vec2& point);
+				bool IsInside(const glm::vec2& point) const;
 
 				template <typename T>
 				void AddPoints(T cbegin, T cend)
