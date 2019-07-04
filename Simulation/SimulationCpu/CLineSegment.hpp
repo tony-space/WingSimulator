@@ -17,6 +17,7 @@ namespace wing2d
 				float DistanceToLine(const glm::vec2& pos) const;
 
 				const auto& normal() const { return m_normal; }
+				const auto& origin() const { return m_origin;  }
 			private:
 				glm::vec2 m_origin;
 				glm::vec2 m_ray;

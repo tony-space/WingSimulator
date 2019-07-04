@@ -21,7 +21,7 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 
 float CSimulationCpu::Update()
 {
-	constexpr float dt = 0.0001f;
+	constexpr float dt = 0.001f;
 
 	for (auto& p : m_state.particles)
 	{
@@ -33,8 +33,40 @@ float CSimulationCpu::Update()
 			if (distance <= 0.0f && glm::dot(p.vel, w.normal()) < 0.0f)
 				p.vel = glm::reflect(p.vel, w.normal());
 		}
-	}
 
+		auto range = m_wing | boost::adaptors::transformed([&](const CTriangle& t)
+		{
+			glm::vec2 normal;
+			float depth = FLT_MAX;
+			auto intersected = false;
+			//bool intersected = t.IsIntersected(p.pos, m_state.particleRad, normal, depth);
+
+			if (intersected)
+			{
+				auto toParticle = p.pos - t.center();
+				intersected = glm::dot(toParticle, p.vel) < 0.0f;
+			}
+			return std::make_tuple(intersected, depth, normal);
+		}) | boost::adaptors::filtered([](const auto& t)
+		{
+			return std::get<0>(t);
+		}) | boost::adaptors::transformed([](const auto& t)
+		{
+			return std::make_tuple(std::get<1>(t), std::get<2>(t));
+		});
+
+		std::vector<decltype(range)::value_type> collisions(range.begin(), range.end());
+
+		if (collisions.size() > 0)
+		{
+			auto it = std::min_element(collisions.begin(), collisions.end(), [](const auto& t1, const auto& t2)
+			{
+				return std::get<0>(t1) < std::get<0>(t2);
+			});
+
+			p.vel = glm::reflect(p.vel, std::get<1>(*it));
+		}
+	}
 
 	return dt;
 }

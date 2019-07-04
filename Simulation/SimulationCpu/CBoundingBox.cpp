@@ -19,12 +19,12 @@ void CBoundingBox::AddPoint(const glm::vec2& point)
 
 bool CBoundingBox::IsInside(const glm::vec2& point) const
 {
-	bool outside = false;
+	auto outside = false;
 
-	outside |= point.x > m_max.x;
-	outside |= point.y > m_max.y;
-	outside |= point.x < m_min.x;
-	outside |= point.y < m_min.y;
+	outside = outside || point.x > m_max.x;
+	outside = outside || point.y > m_max.y;
+	outside = outside || point.x < m_min.x;
+	outside = outside || point.y < m_min.y;
 
 	return !outside;
 }

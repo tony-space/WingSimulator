@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 64;
+constexpr size_t kParticles = 256;
 
 class CSmartFile
 {
@@ -57,8 +57,20 @@ wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char
 		std::deque<glm::vec2> deque;
 		std::generate_n(std::back_inserter(deque), vertices1, vertexParser);
 		std::generate_n(std::front_inserter(deque), vertices2, vertexParser);
-		wing.airfoil.reserve(deque.size());
-		std::copy(deque.cbegin(), deque.cend(), std::back_inserter(wing.airfoil));
+
+		auto range = deque | boost::adaptors::transformed([](const glm::vec2& v) { return std::make_tuple(v.x, v.y); });
+
+		std::set uniquePoints(range.begin(), range.end());
+		wing.airfoil.reserve(uniquePoints.size());
+		for (const glm::vec2& v : deque)
+		{
+			auto it = uniquePoints.find(std::make_tuple(v.x, v.y));
+			if (it != uniquePoints.end())
+			{
+				wing.airfoil.emplace_back(v);
+				uniquePoints.erase(it);
+			}
+		}
 	}
 
 	//std::transform(wing.airfoil.cbegin(), wing.airfoil.cend(), wing.airfoil.begin(), [](const auto& v) {return v * 3.0f - glm::vec2(1.25f, 0.0f); });
@@ -97,7 +109,7 @@ void SetupState(wing2d::simulation::ISimulation* simulation, wing2d::simulation:
 	std::generate_n(std::back_inserter(state.particles), kParticles, []()
 	{
 		wing2d::simulation::serialization::Particle p;
-		p.pos = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
+		p.pos = glm::linearRand(glm::vec2(-1.0f), glm::vec2(0.0f, 1.0f));
 		p.vel = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
 
 		return p;

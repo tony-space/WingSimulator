@@ -19,13 +19,17 @@ namespace wing2d
 			public:
 				CTriangle(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c);
 
-				bool IsIntersected(const glm::vec2& pos, float rad, glm::vec2& outNormal, float& outDepth) const;
+				const glm::vec2& center() const { return m_center; }
+
+				bool IsIntersected(const glm::vec2& pos, const glm::vec2& vel, float rad, glm::vec2& outNormal, float& outDepth) const;
 			private:
 				CBoundingBox m_box;
 
 				CLineSegment m_e1;
 				CLineSegment m_e2;
 				CLineSegment m_e3;
+
+				glm::vec2 m_center;
 			};
 		}
 	}
