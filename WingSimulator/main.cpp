@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 512;
+constexpr size_t kParticles = 2048;
+constexpr float kParticleRad = 0.01f;
 
 class CSmartFile
 {
@@ -74,13 +75,14 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::vec2>&& airfoil)
 {
 	wing2d::simulation::serialization::SimulationState state;
+	state.particleRad = kParticleRad;
 
 	state.particles.reserve(kParticles);
 	std::generate_n(std::back_inserter(state.particles), kParticles, []()
 	{
 		wing2d::simulation::serialization::Particle p;
-		p.pos = glm::linearRand(glm::vec2(-1.0f), glm::vec2(0.0f, 1.0f));
-		p.vel = glm::linearRand(glm::vec2(-1.0f), glm::vec2(1.0f));
+		p.pos = glm::linearRand(glm::vec2(-1.0f + kParticleRad), glm::vec2(0.0f - kParticleRad, 1.0f - kParticleRad));
+		p.vel = glm::linearRand(glm::vec2(-1.0f + +kParticleRad), glm::vec2(1.0f - kParticleRad));
 
 		return p;
 	});

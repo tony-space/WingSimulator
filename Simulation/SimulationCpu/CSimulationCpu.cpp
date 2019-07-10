@@ -1,6 +1,5 @@
 #include "pch.hpp"
 #include "CSimulationCpu.hpp"
-#include "collisions.hpp"
 
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::serialization;
@@ -14,7 +13,9 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
+	m_lineSeqments.clear();
 	BuildWalls();
+	BuildWing();
 }
 
 float CSimulationCpu::Update(float dt)
@@ -26,11 +27,23 @@ float CSimulationCpu::Update(float dt)
 	for (size_t i = 0; i < m_state.particles.size(); ++i)
 	{
 		const auto& particle = m_state.particles[i];
+		collisions::SCollisionForecast response;
 
 		for (const auto& point : m_state.airfoil)
 		{
-			collisions::SCollisionForecast response;
 			if (collisions::TimeToPoint(particle.pos, particle.vel, m_state.particleRad, point, response))
+			{
+				if (response.timeToCollision < closestCollision.timeToCollision)
+				{
+					closestCollision = response;
+					particleId = i;
+				}
+			}
+		}
+
+		for (const auto& w : m_lineSeqments)
+		{
+			if (w.PredictCollision(particle.pos, particle.vel, m_state.particleRad, response))
 			{
 				if (response.timeToCollision < closestCollision.timeToCollision)
 				{
@@ -47,19 +60,7 @@ float CSimulationCpu::Update(float dt)
 		dt = closestCollision.timeToCollision;
 
 	for (auto& p : m_state.particles)
-	{
 		p.pos += p.vel * dt;
-
-		for (const auto& w : m_walls)
-		{
-			auto distance = w.DistanceToLine(p.pos) - m_state.particleRad;
-			if (distance <= 0.0f && glm::dot(p.vel, w.normal()) < 0.0f)
-			{
-				p.vel = glm::reflect(p.vel, w.normal());
-				p.pos -= w.normal() * distance;
-			}
-		}
-	}
 
 	if (particleId != -1)
 	{
@@ -83,10 +84,23 @@ void CSimulationCpu::BuildWalls()
 	glm::vec2 bottomRight(corner.x, -corner.y);
 	glm::vec2 bottomLeft(-corner.x, -corner.y);
 
-	m_walls.clear();
-	m_walls.reserve(4);
-	m_walls.emplace_back(topLeft, topRight);
-	m_walls.emplace_back(topRight, bottomRight);
-	m_walls.emplace_back(bottomRight, bottomLeft);
-	m_walls.emplace_back(bottomLeft, topLeft);
+	m_lineSeqments.emplace_back(topLeft, topRight);
+	m_lineSeqments.emplace_back(topRight, bottomRight);
+	m_lineSeqments.emplace_back(bottomRight, bottomLeft);
+	m_lineSeqments.emplace_back(bottomLeft, topLeft);
+}
+
+void wing2d::simulation::cpu::CSimulationCpu::BuildWing()
+{
+	for (size_t i = 0; i < m_state.airfoil.size() - 1; ++i)
+	{
+		const auto& first = m_state.airfoil[i];
+		const auto& second = m_state.airfoil[i + 1];
+		m_lineSeqments.emplace_back(first, second);
+	}
+
+	if (m_state.airfoil.size() >= 2)
+	{
+		m_lineSeqments.emplace_back(m_state.airfoil.back(), m_state.airfoil.front());
+	}
 }

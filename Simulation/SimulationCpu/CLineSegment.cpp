@@ -1,5 +1,4 @@
 #include "pch.hpp"
-
 #include "CLineSegment.hpp"
 
 using namespace wing2d::simulation::cpu;
@@ -8,7 +7,8 @@ CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b)
 {
 	auto delta = b - a;
 	m_length = glm::length(delta);
-	m_origin = a;
+	m_first = a;
+	m_second = b;
 
 	if (m_length > 1e-16f)
 		m_ray = delta / m_length;
@@ -19,11 +19,28 @@ CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b)
 	m_distance = glm::dot(a, m_normal);
 }
 
-float CLineSegment::DistanceToLine(const glm::vec2& pos) const
+bool wing2d::simulation::cpu::CLineSegment::PredictCollision(const glm::vec2& pos, const glm::vec2& vel, float rad, collisions::SCollisionForecast& out) const
 {
-	auto dirToCenter = pos - m_origin;
-	auto centerProj = glm::dot(dirToCenter, m_ray);
-	auto isAbove = glm::sign(glm::dot(dirToCenter, m_normal));
+	out.timeToCollision = INFINITY;
 
-	return isAbove * glm::sqrt(glm::dot(dirToCenter, dirToCenter) - centerProj * centerProj);
+	collisions::SCollisionForecast temp;
+
+	if (TimeToLine(pos, vel, rad, m_normal, m_distance, temp))
+	{
+		//intersection might happen to infinite line, but not necessarily to the finite line segment 
+		auto contact = glm::dot(temp.contactPoint - m_first, m_ray);
+		if (contact >= 0.0f && contact <= m_length) //if contact point is between start and pos;
+		{
+			if(temp.timeToCollision > 0.0f)
+				out = temp;
+		}
+	}
+
+	if (TimeToPoint(pos, vel, rad, m_first, temp) && temp.timeToCollision < out.timeToCollision)
+		out = temp;
+
+	if (TimeToPoint(pos, vel, rad, m_second, temp) && temp.timeToCollision < out.timeToCollision)
+		out = temp;
+
+	return out.timeToCollision != INFINITY;
 }

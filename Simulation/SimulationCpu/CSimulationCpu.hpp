@@ -18,9 +18,10 @@ namespace wing2d
 				virtual const serialization::SimulationState& GetState() override;
 			private:
 				wing2d::simulation::serialization::SimulationState m_state;
-				std::vector<CLineSegment> m_walls;
+				std::vector<CLineSegment> m_lineSeqments;
 
 				void BuildWalls();
+				void BuildWing();
 			};
 		}
 	}

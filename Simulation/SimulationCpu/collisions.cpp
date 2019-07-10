@@ -26,7 +26,6 @@ bool wing2d::simulation::cpu::collisions::TimeToPoint(const glm::vec2& pos, cons
 		return false;
 	auto sqrtD = glm::sqrt(D);
 	auto t = (-b - sqrtD) / (2.0f * a);
-	//auto t2 = (-b + sqrtD) / (2.0f * a);
 
 	assert(t >= 0.0f);
 
@@ -37,7 +36,29 @@ bool wing2d::simulation::cpu::collisions::TimeToPoint(const glm::vec2& pos, cons
 	return true;
 }
 
-bool wing2d::simulation::cpu::collisions::TimeToPlane(const glm::vec2& pos, const glm::vec2& vel, float rad, const glm::vec2& planeNormal, float planeDistance, SCollisionForecast& out)
+bool wing2d::simulation::cpu::collisions::TimeToLine(const glm::vec2& pos, const glm::vec2& vel, float rad, glm::vec2 lineNormal, float lineDistance, SCollisionForecast& out)
 {
-	return false;
+	auto distanceToLine = glm::dot(pos, lineNormal) - lineDistance;
+	if (distanceToLine < 0.0f)
+	{
+		distanceToLine *= -1.0f;
+		lineNormal *= -1.0f;
+	}
+
+	auto approachVel = -glm::dot(vel, lineNormal);
+	
+	//if almost zero or negative
+	if (approachVel < 1e-16f)
+		return false;
+
+	//The distance to the line may become negative.
+	//That means, the particle intersects infinite line,
+	//but that doesn't necessarily mean that the particle intersects the line segment
+	distanceToLine -= rad;
+
+	out.timeToCollision = distanceToLine / approachVel;
+	out.normal = lineNormal;
+	out.contactPoint = pos + vel * out.timeToCollision - lineNormal * rad;
+
+	return true;
 }

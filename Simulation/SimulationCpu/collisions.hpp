@@ -16,7 +16,7 @@ namespace wing2d
 				};
 
 				bool TimeToPoint(const glm::vec2& pos, const glm::vec2& vel, float rad, const glm::vec2& point, SCollisionForecast& out);
-				bool TimeToPlane(const glm::vec2& pos, const glm::vec2& vel, float rad, const glm::vec2& planeNormal, float planeDistance, SCollisionForecast& out);
+				bool TimeToLine(const glm::vec2& pos, const glm::vec2& vel, float rad, glm::vec2 lineNormal, float lineDistance, SCollisionForecast& out);
 			}
 		}
 	}
