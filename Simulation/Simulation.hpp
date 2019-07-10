@@ -27,26 +27,14 @@ namespace wing2d
 
 				float particleRad = 0.01f;
 				std::vector<Particle> particles;
-				struct SWing
-				{
-					struct STriangle
-					{
-						using value_type = uint16_t;
-						value_type i1;
-						value_type i2;
-						value_type i3;
-					};
-
-					std::vector<glm::vec2> airfoil;
-					std::vector<STriangle> triangles;
-				} wing;
+				std::vector<glm::vec2> airfoil;
 			};
 		}
 
 		struct ISimulation
 		{
 			virtual void ResetState(const serialization::SimulationState& state) = 0;
-			virtual float Update() = 0;
+			virtual float Update(float dt) = 0;
 			virtual const serialization::SimulationState& GetState() = 0;
 			virtual ~ISimulation() = default;
 		};

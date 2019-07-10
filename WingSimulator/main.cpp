@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 256;
+constexpr size_t kParticles = 512;
 
 class CSmartFile
 {
@@ -25,7 +25,7 @@ private:
 	FILE* m_pFile;
 };
 
-wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char* path)
+std::vector<glm::vec2> LoadAirfoil(const char* path)
 {
 	CSmartFile pFile(path);
 
@@ -50,58 +50,28 @@ wing2d::simulation::serialization::SimulationState::SWing LoadAirfoil(const char
 		return result;
 	};
 
-	using namespace wing2d::simulation::serialization;
-	SimulationState::SWing wing;
+	std::deque<glm::vec2> deque;
+	std::vector<glm::vec2> airfoil;
+	std::generate_n(std::back_inserter(deque), vertices1, vertexParser);
+	std::generate_n(std::front_inserter(deque), vertices2, vertexParser);
 
+	auto range = deque | boost::adaptors::transformed([](const glm::vec2& v) { return std::make_tuple(v.x, v.y); });
+
+	std::set uniquePoints(range.begin(), range.end());
+	airfoil.reserve(uniquePoints.size());
+	for (const glm::vec2& v : deque)
 	{
-		std::deque<glm::vec2> deque;
-		std::generate_n(std::back_inserter(deque), vertices1, vertexParser);
-		std::generate_n(std::front_inserter(deque), vertices2, vertexParser);
-
-		auto range = deque | boost::adaptors::transformed([](const glm::vec2& v) { return std::make_tuple(v.x, v.y); });
-
-		std::set uniquePoints(range.begin(), range.end());
-		wing.airfoil.reserve(uniquePoints.size());
-		for (const glm::vec2& v : deque)
+		auto it = uniquePoints.find(std::make_tuple(v.x, v.y));
+		if (it != uniquePoints.end())
 		{
-			auto it = uniquePoints.find(std::make_tuple(v.x, v.y));
-			if (it != uniquePoints.end())
-			{
-				wing.airfoil.emplace_back(v);
-				uniquePoints.erase(it);
-			}
+			airfoil.emplace_back(v);
+			uniquePoints.erase(it);
 		}
 	}
-
-	//std::transform(wing.airfoil.cbegin(), wing.airfoil.cend(), wing.airfoil.begin(), [](const auto& v) {return v * 3.0f - glm::vec2(1.25f, 0.0f); });
-
-	/*wing.airfoil = std::vector<glm::vec2>({
-			glm::vec2(-0.5f, -0.5f),
-			glm::vec2(0.5f, -0.5f),
-			glm::vec2(0.5f, 0.5f),
-			glm::vec2(-0.5f, 0.5f) });*/
-
-	{
-		std::vector<std::pair<float, float>> curve;
-		boost::push_back(curve, wing.airfoil | boost::adaptors::transformed([](const auto& v) {return std::make_pair(v.x, v.y); }));
-
-		std::vector<decltype(curve)> curves = { curve };
-		auto indices = mapbox::earcut<uint16_t>(curves);
-		wing.triangles.reserve(indices.size() / 3);
-		boost::push_back(wing.triangles, indices | boost::adaptors::strided(3) | boost::adaptors::transformed([](const auto& index)
-		{
-			using namespace wing2d::simulation::serialization;
-			SimulationState::SWing::STriangle t;
-			t.i1 = index;
-			t.i2 = *(&index + 1);
-			t.i3 = *(&index + 2);
-			return t;
-		}));
-	}
-	return wing;
+	return airfoil;
 }
 
-void SetupState(wing2d::simulation::ISimulation* simulation, wing2d::simulation::serialization::SimulationState::SWing&& wing)
+void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::vec2>&& airfoil)
 {
 	wing2d::simulation::serialization::SimulationState state;
 
@@ -115,7 +85,7 @@ void SetupState(wing2d::simulation::ISimulation* simulation, wing2d::simulation:
 		return p;
 	});
 	state.worldSize.width = (4.0f / 3.0f) * 2.0f;
-	state.wing = std::move(wing);
+	state.airfoil = std::move(airfoil);
 
 	simulation->ResetState(state);
 }
@@ -137,7 +107,7 @@ int main(int argc, char** argv)
 		renderer->SetOnUpdate([&]()
 		{
 			renderer->RenderAsync(simulation->GetState());
-			float t = simulation->Update();
+			float t = simulation->Update(0.0001f);
 		});
 
 		renderer->InitWindowLoop(800, 600, false);

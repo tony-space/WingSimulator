@@ -72,19 +72,19 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\earcut\4ad849c1eb3fa850465f6a14ba31fe03de714538;$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\earcut\4ad849c1eb3fa850465f6a14ba31fe03de714538;$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\earcut\4ad849c1eb3fa850465f6a14ba31fe03de714538;$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\earcut\4ad849c1eb3fa850465f6a14ba31fe03de714538;$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\boost\boost-1.70.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.5;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

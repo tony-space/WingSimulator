@@ -6,6 +6,53 @@ using namespace wing2d::simulation;
 using namespace wing2d::simulation::serialization;
 using namespace wing2d::simulation::cpu;
 
+struct CollisionResponse
+{
+	glm::vec2 contactPoint;
+	glm::vec2 normal;
+	float timeToCollision;
+};
+
+bool PredictCollisionTime(const glm::vec2& pos, const glm::vec2& vel, float rad, const glm::vec2& point, CollisionResponse& out)
+{
+	//C0 + Vt = C1
+	//(P - C1) dot (P - C1) = r^2
+
+	auto deltaPos = point - pos;
+	auto a = glm::dot(vel, vel);
+	auto b = 2.0f * glm::dot(vel, deltaPos);
+	auto c = glm::dot(deltaPos, deltaPos) - rad * rad;
+
+	if (glm::abs(a) < 1e-16)
+		return false;
+
+	if (b <= 0.0f)
+		return false;
+
+	auto D = b * b - 4 * a * c;
+	if (D < 0)
+		return false;
+	auto sqrtD = glm::sqrt(D);
+	auto t1 = (-b - sqrtD) / (2.0f * a);
+	auto t2 = (-b + sqrtD) / (2.0f * a);
+
+	auto t = INFINITY;
+	if (t1 > 0.0f)
+		t = std::min(t, t1);
+
+	if (t2 > 0.0f)
+		t = std::min(t, t2);
+
+	if (t == INFINITY)
+		return false;
+
+	out.timeToCollision = t;
+	out.contactPoint = point;
+	out.normal = glm::normalize(pos - point);
+
+	return true;
+}
+
 std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 {
 	return std::make_unique<CSimulationCpu>();
@@ -14,14 +61,34 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	m_state = state;
-
-	BuildWing(state);
-	BuildWalls(state);
+	BuildWalls();
 }
 
-float CSimulationCpu::Update()
+float CSimulationCpu::Update(float dt)
 {
-	constexpr float dt = 0.001f;
+	CollisionResponse closestCollision;
+	closestCollision.timeToCollision = INFINITY;
+	size_t particleId = -1;
+
+	for (size_t i = 0; i < m_state.particles.size(); ++i)
+	{
+		const auto& particle = m_state.particles[i];
+
+		for (const auto& point : m_state.airfoil)
+		{
+			CollisionResponse response;
+			if (PredictCollisionTime(particle.pos, particle.vel, m_state.particleRad, point, response))
+			{
+				if (response.timeToCollision < closestCollision.timeToCollision)
+				{
+					closestCollision = response;
+					particleId = i;
+				}
+			}
+		}
+	}
+
+	dt = std::min(dt, closestCollision.timeToCollision);
 
 	for (auto& p : m_state.particles)
 	{
@@ -33,39 +100,12 @@ float CSimulationCpu::Update()
 			if (distance <= 0.0f && glm::dot(p.vel, w.normal()) < 0.0f)
 				p.vel = glm::reflect(p.vel, w.normal());
 		}
+	}
 
-		auto range = m_wing | boost::adaptors::transformed([&](const CTriangle& t)
-		{
-			glm::vec2 normal;
-			float depth = FLT_MAX;
-			auto intersected = false;
-			//bool intersected = t.IsIntersected(p.pos, m_state.particleRad, normal, depth);
-
-			if (intersected)
-			{
-				auto toParticle = p.pos - t.center();
-				intersected = glm::dot(toParticle, p.vel) < 0.0f;
-			}
-			return std::make_tuple(intersected, depth, normal);
-		}) | boost::adaptors::filtered([](const auto& t)
-		{
-			return std::get<0>(t);
-		}) | boost::adaptors::transformed([](const auto& t)
-		{
-			return std::make_tuple(std::get<1>(t), std::get<2>(t));
-		});
-
-		std::vector<decltype(range)::value_type> collisions(range.begin(), range.end());
-
-		if (collisions.size() > 0)
-		{
-			auto it = std::min_element(collisions.begin(), collisions.end(), [](const auto& t1, const auto& t2)
-			{
-				return std::get<0>(t1) < std::get<0>(t2);
-			});
-
-			p.vel = glm::reflect(p.vel, std::get<1>(*it));
-		}
+	if (particleId != -1)
+	{
+		auto& p = m_state.particles[particleId];
+		p.vel = glm::reflect(p.vel, closestCollision.normal);
 	}
 
 	return dt;
@@ -76,26 +116,9 @@ const serialization::SimulationState& CSimulationCpu::GetState()
 	return m_state;
 }
 
-void CSimulationCpu::BuildWing(const SimulationState &state)
+void CSimulationCpu::BuildWalls()
 {
-	m_wing.clear();
-	m_wing.reserve(state.wing.triangles.size());
-
-	auto range = state.wing.triangles | boost::adaptors::transformed([&](const auto& t)
-	{
-		const glm::vec2& a = state.wing.airfoil[t.i1];
-		const glm::vec2& b = state.wing.airfoil[t.i2];
-		const glm::vec2& c = state.wing.airfoil[t.i3];
-
-		return CTriangle(a, b, c);
-	});
-
-	boost::range::push_back(m_wing, range);
-}
-
-void CSimulationCpu::BuildWalls(const SimulationState &state)
-{
-	glm::vec2 corner(state.worldSize.width / 2.0f, state.worldSize.height / 2.0f);
+	glm::vec2 corner(m_state.worldSize.width / 2.0f, m_state.worldSize.height / 2.0f);
 	glm::vec2 topLeft(-corner.x, corner.y);
 	glm::vec2 topRight(corner.x, corner.y);
 	glm::vec2 bottomRight(corner.x, -corner.y);

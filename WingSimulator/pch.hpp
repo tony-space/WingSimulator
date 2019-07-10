@@ -11,7 +11,5 @@
 
 #include <glm/gtc/random.hpp>
 
-#include <earcut.hpp>
-
 #include "../Simulation/Simulation.hpp"
 #include "../Rendering/Rendering.hpp"

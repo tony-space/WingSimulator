@@ -22,8 +22,12 @@ namespace wing2d
 				glm::vec2 m_origin;
 				glm::vec2 m_ray;
 				glm::vec2 m_normal;
-				float m_size;
-				float __padding;
+				
+				//length of the line segment
+				float m_length;
+
+				//distance to the center of frame of reference
+				float m_distance;
 			};
 		}
 	}
