@@ -16,7 +16,7 @@ CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b)
 		m_length = 0.0f;
 
 	m_normal = glm::vec2(m_ray.y, -m_ray.x);
-	m_length = glm::dot(a, m_normal);
+	m_distance = glm::dot(a, m_normal);
 }
 
 float CLineSegment::DistanceToLine(const glm::vec2& pos) const

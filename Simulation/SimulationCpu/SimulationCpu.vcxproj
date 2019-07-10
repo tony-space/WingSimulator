@@ -161,12 +161,14 @@
   <ItemGroup>
     <ClInclude Include="CBoundingBox.hpp" />
     <ClInclude Include="CLineSegment.hpp" />
+    <ClInclude Include="collisions.hpp" />
     <ClInclude Include="CSimulationCpu.hpp" />
     <ClInclude Include="pch.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CBoundingBox.cpp" />
     <ClCompile Include="CLineSegment.cpp" />
+    <ClCompile Include="collisions.cpp" />
     <ClCompile Include="CSimulationCpu.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

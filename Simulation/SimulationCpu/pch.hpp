@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cfloat>
+#include <cassert>
+
 #include <vector>
 #include <memory>
-#include <cfloat>
 
 #include <algorithm>
 #include <numeric>

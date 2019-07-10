@@ -1,57 +1,10 @@
 #include "pch.hpp"
 #include "CSimulationCpu.hpp"
-#include "CBoundingBox.hpp"
+#include "collisions.hpp"
 
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::serialization;
 using namespace wing2d::simulation::cpu;
-
-struct CollisionResponse
-{
-	glm::vec2 contactPoint;
-	glm::vec2 normal;
-	float timeToCollision;
-};
-
-bool PredictCollisionTime(const glm::vec2& pos, const glm::vec2& vel, float rad, const glm::vec2& point, CollisionResponse& out)
-{
-	//C0 + Vt = C1
-	//(P - C1) dot (P - C1) = r^2
-
-	auto deltaPos = point - pos;
-	auto a = glm::dot(vel, vel);
-	auto b = 2.0f * glm::dot(vel, deltaPos);
-	auto c = glm::dot(deltaPos, deltaPos) - rad * rad;
-
-	if (glm::abs(a) < 1e-16)
-		return false;
-
-	if (b <= 0.0f)
-		return false;
-
-	auto D = b * b - 4 * a * c;
-	if (D < 0)
-		return false;
-	auto sqrtD = glm::sqrt(D);
-	auto t1 = (-b - sqrtD) / (2.0f * a);
-	auto t2 = (-b + sqrtD) / (2.0f * a);
-
-	auto t = INFINITY;
-	if (t1 > 0.0f)
-		t = std::min(t, t1);
-
-	if (t2 > 0.0f)
-		t = std::min(t, t2);
-
-	if (t == INFINITY)
-		return false;
-
-	out.timeToCollision = t;
-	out.contactPoint = point;
-	out.normal = glm::normalize(pos - point);
-
-	return true;
-}
 
 std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 {
@@ -66,7 +19,7 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 
 float CSimulationCpu::Update(float dt)
 {
-	CollisionResponse closestCollision;
+	collisions::SCollisionForecast closestCollision;
 	closestCollision.timeToCollision = INFINITY;
 	size_t particleId = -1;
 
@@ -76,8 +29,8 @@ float CSimulationCpu::Update(float dt)
 
 		for (const auto& point : m_state.airfoil)
 		{
-			CollisionResponse response;
-			if (PredictCollisionTime(particle.pos, particle.vel, m_state.particleRad, point, response))
+			collisions::SCollisionForecast response;
+			if (collisions::TimeToPoint(particle.pos, particle.vel, m_state.particleRad, point, response))
 			{
 				if (response.timeToCollision < closestCollision.timeToCollision)
 				{
@@ -88,7 +41,10 @@ float CSimulationCpu::Update(float dt)
 		}
 	}
 
-	dt = std::min(dt, closestCollision.timeToCollision);
+	if (dt < closestCollision.timeToCollision)
+		particleId = -1;
+	else
+		dt = closestCollision.timeToCollision;
 
 	for (auto& p : m_state.particles)
 	{
@@ -98,7 +54,10 @@ float CSimulationCpu::Update(float dt)
 		{
 			auto distance = w.DistanceToLine(p.pos) - m_state.particleRad;
 			if (distance <= 0.0f && glm::dot(p.vel, w.normal()) < 0.0f)
+			{
 				p.vel = glm::reflect(p.vel, w.normal());
+				p.pos -= w.normal() * distance;
+			}
 		}
 	}
 
