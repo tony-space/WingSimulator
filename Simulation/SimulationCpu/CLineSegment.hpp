@@ -14,6 +14,7 @@ namespace wing2d
 			public:
 				CLineSegment(const glm::vec2& first, const glm::vec2& second);
 
+				float DistanceToLine(const glm::vec2& pos) const;
 				bool PredictCollision(const glm::vec2& pos, const glm::vec2& vel, float rad, collisions::SCollisionForecast& out) const;
 
 				const auto& normal() const { return m_normal; }

@@ -18,7 +18,10 @@ namespace wing2d
 				virtual const serialization::SimulationState& GetState() override;
 			private:
 				wing2d::simulation::serialization::SimulationState m_state;
-				std::vector<CLineSegment> m_lineSeqments;
+				std::vector<CLineSegment> m_walls;
+				std::vector<glm::vec2> m_forces;
+
+				size_t m_fixedCount = 0;
 
 				void BuildWalls();
 				void BuildWing();

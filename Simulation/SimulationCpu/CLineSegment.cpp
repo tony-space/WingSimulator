@@ -19,6 +19,15 @@ CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b)
 	m_distance = glm::dot(a, m_normal);
 }
 
+float CLineSegment::DistanceToLine(const glm::vec2& pos) const
+{
+	auto dirToCenter = pos - m_first;
+	auto centerProj = glm::dot(dirToCenter, m_ray);
+	auto isAbove = glm::sign(glm::dot(dirToCenter, m_normal));
+
+	return isAbove * glm::sqrt(glm::dot(dirToCenter, dirToCenter) - centerProj * centerProj);
+}
+
 bool wing2d::simulation::cpu::CLineSegment::PredictCollision(const glm::vec2& pos, const glm::vec2& vel, float rad, collisions::SCollisionForecast& out) const
 {
 	out.timeToCollision = INFINITY;

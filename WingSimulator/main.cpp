@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 2048;
-constexpr float kParticleRad = 0.01f;
+constexpr size_t kParticles = 4096;
+constexpr float kParticleRad = 0.005f;
 
 class CSmartFile
 {
@@ -76,17 +76,26 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 {
 	wing2d::simulation::serialization::SimulationState state;
 	state.particleRad = kParticleRad;
+	state.worldSize.width = (4.0f / 3.0f) * 2.0f;
 
 	state.particles.reserve(kParticles);
-	std::generate_n(std::back_inserter(state.particles), kParticles, []()
+	std::generate_n(std::back_inserter(state.particles), kParticles, [&]()
 	{
 		wing2d::simulation::serialization::Particle p;
-		p.pos = glm::linearRand(glm::vec2(-1.0f + kParticleRad), glm::vec2(0.0f - kParticleRad, 1.0f - kParticleRad));
-		p.vel = glm::linearRand(glm::vec2(-1.0f + +kParticleRad), glm::vec2(1.0f - kParticleRad));
+		//p.pos = glm::linearRand(glm::vec2(-1.0f + kParticleRad), glm::vec2(0.0f - kParticleRad, 1.0f - kParticleRad));
+		p.pos.x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
+		p.pos.y = glm::linearRand(0.25f, 1.0f);
+
+		//p.vel = glm::linearRand(glm::vec2(-0.3f), glm::vec2(0.3f));
 
 		return p;
 	});
-	state.worldSize.width = (4.0f / 3.0f) * 2.0f;
+
+	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [](const auto& a)
+	{
+		return a - glm::vec2(0.5f, 0.5f);
+	});
+
 	state.airfoil = std::move(airfoil);
 
 	simulation->ResetState(state);
@@ -109,10 +118,11 @@ int main(int argc, char** argv)
 		renderer->SetOnUpdate([&]()
 		{
 			renderer->RenderAsync(simulation->GetState());
-			float t = simulation->Update(0.001f);
+			float t = simulation->Update(0.01f);
 		});
 
-		renderer->InitWindowLoop(800, 600, false);
+		//renderer->InitWindowLoop(1920, 1080, true);
+		renderer->InitWindowLoop(1024, 768, false);
 	}
 	catch (const std::exception& ex)
 	{
