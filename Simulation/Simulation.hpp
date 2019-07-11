@@ -4,6 +4,7 @@
 #include <memory>
 #include <cstdint>
 #include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 
 namespace wing2d
 {
@@ -15,6 +16,7 @@ namespace wing2d
 			{
 				glm::vec2 pos;
 				glm::vec2 vel;
+				glm::vec4 color;
 			};
 
 			struct SimulationState

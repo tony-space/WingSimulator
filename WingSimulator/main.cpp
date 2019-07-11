@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 4096;
+constexpr size_t kParticles = 8192;
 constexpr float kParticleRad = 0.005f;
 
 class CSmartFile
@@ -81,13 +81,13 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 	state.particles.reserve(kParticles);
 	std::generate_n(std::back_inserter(state.particles), kParticles, [&]()
 	{
-		wing2d::simulation::serialization::Particle p;
+		auto p = wing2d::simulation::serialization::Particle();
 		//p.pos = glm::linearRand(glm::vec2(-1.0f + kParticleRad), glm::vec2(0.0f - kParticleRad, 1.0f - kParticleRad));
 		p.pos.x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
 		p.pos.y = glm::linearRand(0.25f, 1.0f);
 
 		//p.vel = glm::linearRand(glm::vec2(-0.3f), glm::vec2(0.3f));
-
+		
 		return p;
 	});
 
@@ -118,7 +118,7 @@ int main(int argc, char** argv)
 		renderer->SetOnUpdate([&]()
 		{
 			renderer->RenderAsync(simulation->GetState());
-			float t = simulation->Update(0.01f);
+			float t = simulation->Update(0.0005f);
 		});
 
 		//renderer->InitWindowLoop(1920, 1080, true);

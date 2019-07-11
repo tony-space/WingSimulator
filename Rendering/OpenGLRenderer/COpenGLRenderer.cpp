@@ -98,14 +98,15 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 	std::vector<glm::vec2> positions(state.particles.size());
 	std::vector<glm::vec4> colors(state.particles.size());
 
-	std::transform(state.particles.begin(), state.particles.end(), positions.begin(), [](const auto& p)
+	std::transform(state.particles.cbegin(), state.particles.cend(), positions.begin(), [](const auto& p)
 	{
 		return p.pos;
 	});
 
-	std::transform(state.particles.begin(), state.particles.end(), colors.begin(), [](const auto& p)
+	std::transform(state.particles.cbegin(), state.particles.cend(), colors.begin(), [](const auto& p)
 	{
-		return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+		//return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+		return p.color;
 	});
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
@@ -126,17 +127,17 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 		glBindVertexArray(0);
 	}
 
-	glColor3f(0.25f, 0.25f, 0.25f);
-	glBegin(GL_LINE_LOOP);
-	for (const auto& v : state.airfoil)
-		glVertex2fv(glm::value_ptr(v));
-	glEnd();
+	//glColor3f(0.25f, 0.25f, 0.25f);
+	//glBegin(GL_LINE_LOOP);
+	//for (const auto& v : state.airfoil)
+	//	glVertex2fv(glm::value_ptr(v));
+	//glEnd();
 
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glBegin(GL_POINTS);
-	for (const auto& v : state.airfoil)
-		glVertex2fv(glm::value_ptr(v));
-	glEnd();
+	//glColor3f(1.0f, 1.0f, 1.0f);
+	//glBegin(GL_POINTS);
+	//for (const auto& v : state.airfoil)
+	//	glVertex2fv(glm::value_ptr(v));
+	//glEnd();
 
 
 	glFlush();

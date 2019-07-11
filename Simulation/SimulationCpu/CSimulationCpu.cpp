@@ -17,23 +17,37 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 	BuildWalls();
 	BuildWing();
 
-	m_forces.resize(m_state.particles.size() - m_fixedCount);
+	m_forces.resize(m_state.particles.size());
 }
 
 glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, const glm::vec2& vel2, float springLen)
 {
-	constexpr float stiffness = 10000.0f;
+	constexpr float stiffness = 20000.0f;
 	constexpr float damp = 50.0f;
 	auto v = glm::dot(vel1 - vel2, normal);
 	auto force = normal * (springLen * stiffness + v * damp);
 	return force;
 }
 
+glm::vec4 getHeatMapColor(float value)
+{
+	value = fminf(fmaxf(value, 0.0f), 1.0f);
+
+	static const size_t stages = 7;
+	static const glm::vec3 heatMap[stages] = { {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f} };
+	value *= stages - 1;
+	int idx1 = int(value);
+	int idx2 = idx1 + 1;
+	float fract1 = value - float(idx1);
+	return glm::vec4(heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]), 1.0f);
+}
+
 float CSimulationCpu::Update(float dt)
 {
 	auto timeRange = m_state.particles | boost::adaptors::sliced(m_fixedCount, m_state.particles.size()) | boost::adaptors::transformed([&](const auto& p)
 	{
-		auto halfRadDt = m_state.particleRad * 0.5f / glm::length(p.vel);
+		auto vel = glm::length(p.vel);
+		auto halfRadDt = m_state.particleRad * 0.5f / vel;
 		return std::min(halfRadDt, dt);
 	});
 
@@ -44,12 +58,11 @@ float CSimulationCpu::Update(float dt)
 	auto diameter = m_state.particleRad * 2.0f;
 	auto diameterSq = diameter * diameter;
 
-
 	for (size_t i = 0; i < m_state.particles.size() - 1; ++i)
 	{
 		auto first = m_state.particles[i];
 
-		for (size_t j = i + 1; j < m_state.particles.size(); ++j)
+		for (size_t j = std::max(m_fixedCount, i + 1); j < m_state.particles.size(); ++j)
 		{
 			auto second = m_state.particles[j];
 
@@ -67,10 +80,8 @@ float CSimulationCpu::Update(float dt)
 
 			auto force = SpringDamper(dir, vel1, vel2, springLen);
 
-			if (i >= m_fixedCount)
-				m_forces[i - m_fixedCount] -= force;
-			if (j >= m_fixedCount)
-				m_forces[j - m_fixedCount] += force;
+			m_forces[i] -= force;
+			m_forces[j] += force;
 		}
 
 		if (i >= m_fixedCount)
@@ -80,20 +91,25 @@ float CSimulationCpu::Update(float dt)
 				if (d < 0.0f && glm::dot(w.normal(), first.pos) < 0.0f)
 				{
 					auto force = SpringDamper(w.normal(), first.vel, glm::vec2(0.0f), d);
-					m_forces[i - m_fixedCount] -= force;
+					m_forces[i] -= force;
 				}
 			}
 	}
 
-	for (size_t i = m_fixedCount; i < m_state.particles.size(); ++i)
+	for (size_t i = 0; i < m_state.particles.size(); ++i)
 	{
 		auto& p = m_state.particles[i];
-		p.pos += p.vel * dt;
-		
-		auto& force = m_forces[i - m_fixedCount];
-		force.y -= 0.5f;
+		auto& force = m_forces[i];
 
-		p.vel += force * dt;
+		if (i >= m_fixedCount)
+		{
+			force.y -= 0.5f;
+			p.pos += p.vel * dt;
+			p.vel += force * dt;
+		}
+
+		//p.color = glm::vec4(1.0f);
+		p.color = getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 8.0f + 0.15f);
 	}
 
 
