@@ -5,7 +5,6 @@ using namespace wing2d;
 using namespace wing2d::rendering;
 using namespace wing2d::rendering::opengl;
 using namespace wing2d::simulation;
-using namespace wing2d::simulation::serialization;
 
 COpenGLRenderer* COpenGLRenderer::instance = nullptr;
 
@@ -89,31 +88,20 @@ void COpenGLRenderer::DisplayFunc()
 	glutReportErrors();
 }
 
-void COpenGLRenderer::RenderAsync(const SimulationState& state)
+void COpenGLRenderer::RenderAsync(const simulation::SimulationState& state)
 {
+	if (!state.IsValid())
+		throw std::runtime_error("state is invalid");
+
 	glClear(GL_COLOR_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	std::vector<glm::vec2> positions(state.particles.size());
-	std::vector<glm::vec4> colors(state.particles.size());
-
-	std::transform(state.particles.cbegin(), state.particles.cend(), positions.begin(), [](const auto& p)
-	{
-		return p.pos;
-	});
-
-	std::transform(state.particles.cbegin(), state.particles.cend(), colors.begin(), [](const auto& p)
-	{
-		//return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
-		return p.color;
-	});
-
 	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * state.pos.size(), state.pos.data(), GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * colors.size(), colors.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * state.color.size(), state.color.data(), GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	{
@@ -123,7 +111,7 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 		float pixelsPerUnit = m_window.y * 0.5f;
 
 		m_program->SetUniform("radius", state.particleRad * pixelsPerUnit * 2.0f);
-		glDrawArrays(GL_POINTS, 0, GLsizei(state.particles.size()));
+		glDrawArrays(GL_POINTS, 0, GLsizei(state.particles));
 		glBindVertexArray(0);
 	}
 
@@ -133,11 +121,11 @@ void COpenGLRenderer::RenderAsync(const SimulationState& state)
 		glVertex2fv(glm::value_ptr(v));
 	glEnd();
 
-	glColor3f(1.0f, 1.0f, 1.0f);
+	/*glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_POINTS);
 	for (const auto& v : state.airfoil)
 		glVertex2fv(glm::value_ptr(v));
-	glEnd();
+	glEnd();*/
 
 
 	glFlush();

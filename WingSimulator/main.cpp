@@ -74,22 +74,20 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 
 void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::vec2>&& airfoil)
 {
-	wing2d::simulation::serialization::SimulationState state;
+	wing2d::simulation::SimulationState state;
 	state.particleRad = kParticleRad;
 	state.worldSize.width = (4.0f / 3.0f) * 2.0f;
 
-	state.particles.reserve(kParticles);
-	std::generate_n(std::back_inserter(state.particles), kParticles, [&]()
-	{
-		auto p = wing2d::simulation::serialization::Particle();
-		//p.pos = glm::linearRand(glm::vec2(-1.0f + kParticleRad), glm::vec2(0.0f - kParticleRad, 1.0f - kParticleRad));
-		p.pos.x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
-		p.pos.y = glm::linearRand(0.25f, 1.0f);
+	state.particles = kParticles;
+	state.pos.resize(kParticles);
+	state.vel.resize(kParticles);
+	state.color.resize(kParticles);
 
-		//p.vel = glm::linearRand(glm::vec2(-0.3f), glm::vec2(0.3f));
-		
-		return p;
-	});
+	for (size_t i = 0; i < kParticles; ++i)
+	{
+		state.pos[i].x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
+		state.pos[i].y = glm::linearRand(0.25f, 1.0f);
+	}
 
 	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [](const auto& a)
 	{

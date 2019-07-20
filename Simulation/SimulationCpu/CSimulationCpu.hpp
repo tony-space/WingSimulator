@@ -13,11 +13,11 @@ namespace wing2d
 			{
 			public:
 				virtual ~CSimulationCpu() override = default;
-				virtual void ResetState(const serialization::SimulationState& state) override;
+				virtual void ResetState(const SimulationState& state) override;
 				virtual float Update(float dt) override;
-				virtual const serialization::SimulationState& GetState() override;
+				virtual const SimulationState& GetState() const override;
 			private:
-				wing2d::simulation::serialization::SimulationState m_state;
+				wing2d::simulation::SimulationState m_state;
 				std::vector<CLineSegment> m_walls;
 				std::vector<glm::vec2> m_forces;
 
@@ -33,6 +33,7 @@ namespace wing2d
 				void ParticleToWing();
 				void ParticleToWall();
 				void MoveParticles(float dt);
+				void ColorParticles();
 			};
 		}
 	}

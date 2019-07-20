@@ -10,34 +10,33 @@ namespace wing2d
 {
 	namespace simulation
 	{
-		namespace serialization
+		struct SimulationState
 		{
-			struct Particle
+			struct
 			{
-				glm::vec2 pos;
-				glm::vec2 vel;
-				glm::vec4 color;
-			};
+				float width = 2.0f;
+				float height = 2.0f;
+			} worldSize;
 
-			struct SimulationState
+			float particleRad = 0.01f;
+			size_t particles = 0;
+
+			std::vector<glm::vec2> pos;
+			std::vector<glm::vec2> vel;
+			std::vector<glm::vec4> color;
+			std::vector<glm::vec2> airfoil;
+
+			bool IsValid() const
 			{
-				struct
-				{
-					float width = 2.0f;
-					float height = 2.0f;
-				} worldSize;
-
-				float particleRad = 0.01f;
-				std::vector<Particle> particles;
-				std::vector<glm::vec2> airfoil;
-			};
-		}
+				return pos.size() == particles && vel.size() == particles && color.size() == particles;
+			}
+		};
 
 		struct ISimulation
 		{
-			virtual void ResetState(const serialization::SimulationState& state) = 0;
+			virtual void ResetState(const SimulationState& state) = 0;
 			virtual float Update(float dt) = 0;
-			virtual const serialization::SimulationState& GetState() = 0;
+			virtual const SimulationState& GetState() const = 0;
 			virtual ~ISimulation() = default;
 		};
 

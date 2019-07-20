@@ -2,7 +2,6 @@
 #include "CSimulationCpu.hpp"
 
 using namespace wing2d::simulation;
-using namespace wing2d::simulation::serialization;
 using namespace wing2d::simulation::cpu;
 
 glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, const glm::vec2& vel2, float springLen)
@@ -34,19 +33,22 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
+	if (!state.IsValid())
+		throw std::runtime_error("state is invalid");
+
 	m_state = state;
 	m_walls.clear();
 	BuildWalls();
 	BuildWing();
 
-	m_forces.resize(m_state.particles.size());
+	m_forces.resize(m_state.particles);
 }
 
 float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 {
-	auto timeRange = m_state.particles | boost::adaptors::transformed([&](const auto& p)
+	auto timeRange = m_state.vel | boost::adaptors::transformed([&](const auto& v)
 	{
-		auto vel = glm::length(p.vel);
+		auto vel = glm::length(v);
 		auto halfRadDt = m_state.particleRad * 0.5f / vel;
 		return std::min(halfRadDt, requestedDt);
 	});
@@ -77,19 +79,19 @@ void CSimulationCpu::ParticleToParticle()
 {
 	const auto diameter = m_state.particleRad * 2.0f;
 
-	for (size_t i = 0; i < m_state.particles.size() - 1; ++i)
+	for (size_t i = 0; i < m_state.particles - 1; ++i)
 	{
-		auto first = m_state.particles[i];
+		const auto &p1 = m_state.pos[i];
+		const auto &v1 = m_state.vel[i];
 
-		for (size_t j = i + 1; j < m_state.particles.size(); ++j)
+		for (size_t j = i + 1; j < m_state.particles; ++j)
 		{
-			auto second = m_state.particles[j];
-			auto force = ComputeForce(first.pos, first.vel, second.pos, second.vel, diameter);
+			const auto& p2 = m_state.pos[j];
+			const auto& v2 = m_state.vel[j];
+			auto force = ComputeForce(p1, v1, p2, v2, diameter);
 			m_forces[i] -= force;
 			m_forces[j] += force;
 		}
-
-		
 	}
 }
 
@@ -97,29 +99,31 @@ void CSimulationCpu::ParticleToWing()
 {
 	const auto diameter = m_state.particleRad * 2.0f;
 
-	for (size_t i = 0; i < m_state.particles.size(); ++i)
+	for (size_t i = 0; i < m_state.particles; ++i)
 	{
-		const auto& particle = m_state.particles[i];
+		const auto &p = m_state.pos[i];
+		const auto &v = m_state.vel[i];
 
 		for (const auto& wp : m_wingParticles)
 		{
-			m_forces[i] -= ComputeForce(particle.pos, particle.vel, wp, glm::vec2(0.0f), diameter);
+			m_forces[i] -= ComputeForce(p, v, wp, glm::vec2(0.0f), diameter);
 		}
 	}
 }
 
 void CSimulationCpu::ParticleToWall()
 {
-	for (size_t i = 0; i < m_state.particles.size(); ++i)
+	for (size_t i = 0; i < m_state.particles; ++i)
 	{
-		const auto& particle = m_state.particles[i];
+		const auto &p = m_state.pos[i];
+		const auto &v = m_state.vel[i];
 
 		for (const auto& w : m_walls)
 		{
-			auto d = w.DistanceToLine(particle.pos) - m_state.particleRad;
-			if (d < 0.0f && glm::dot(w.normal(), particle.pos) < 0.0f)
+			auto d = w.DistanceToLine(p) - m_state.particleRad;
+			if (d < 0.0f && glm::dot(w.normal(), p) < 0.0f)
 			{
-				auto force = SpringDamper(w.normal(), particle.vel, glm::vec2(0.0f), d);
+				auto force = SpringDamper(w.normal(), v, glm::vec2(0.0f), d);
 				m_forces[i] -= force;
 			}
 		}
@@ -128,16 +132,24 @@ void CSimulationCpu::ParticleToWall()
 
 void CSimulationCpu::MoveParticles(float dt)
 {
-	for (size_t i = 0; i < m_state.particles.size(); ++i)
+	for (size_t i = 0; i < m_state.particles; ++i)
 	{
-		auto& p = m_state.particles[i];
-		auto& force = m_forces[i];
+		auto &p = m_state.pos[i];
+		auto &v = m_state.vel[i];
+		auto &f = m_forces[i];
 
-		force.y -= 0.5f;
-		p.pos += p.vel * dt;
-		p.vel += force * dt;
-		//p.color = glm::vec4(1.0f);
-		p.color = getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 8.0f + 0.15f);
+		f.y -= 0.5f;
+		p += v * dt;
+		v += f * dt;
+	}
+}
+
+void CSimulationCpu::ColorParticles()
+{
+	for (size_t i = 0; i < m_state.particles; ++i)
+	{
+		const auto& force = m_forces[i];
+		m_state.color[i] = getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 8.0f + 0.15f);
 	}
 }
 
@@ -150,11 +162,11 @@ float CSimulationCpu::Update(float dt)
 	ParticleToWing();
 	ParticleToWall();
 	MoveParticles(dt);
-
+	ColorParticles();
 	return dt;
 }
 
-const serialization::SimulationState& CSimulationCpu::GetState()
+const SimulationState& CSimulationCpu::GetState() const
 {
 	return m_state;
 }

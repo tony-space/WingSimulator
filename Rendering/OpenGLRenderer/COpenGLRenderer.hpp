@@ -15,7 +15,7 @@ namespace wing2d
 				virtual ~COpenGLRenderer() override;
 
 				virtual void SetOnUpdate(std::function<void()> onUpdate) override;
-				virtual void RenderAsync(const simulation::serialization::SimulationState& state) override;
+				virtual void RenderAsync(const simulation::SimulationState& state) override;
 				virtual void InitWindowLoop(size_t width, size_t height, bool fullscreen = false) override;
 
 			private:
