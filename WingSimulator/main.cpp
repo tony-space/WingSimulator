@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 8192;
+constexpr size_t kParticles = 256;
 constexpr float kParticleRad = 0.005f;
 
 class CSmartFile
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
 		});
 
 		//renderer->InitWindowLoop(1920, 1080, true);
-		renderer->InitWindowLoop(1024, 768, false);
+		renderer->InitWindowLoop(800, 600, false);
 	}
 	catch (const std::exception& ex)
 	{

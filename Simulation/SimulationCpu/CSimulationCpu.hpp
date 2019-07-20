@@ -21,10 +21,18 @@ namespace wing2d
 				std::vector<CLineSegment> m_walls;
 				std::vector<glm::vec2> m_forces;
 
-				size_t m_fixedCount = 0;
+				std::vector<glm::vec2> m_wingParticles;
 
 				void BuildWalls();
 				void BuildWing();
+
+				static glm::vec2 ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter);
+				float ComputeMinDeltaTime(float requestedDt) const;
+				void ResetForces();
+				void ParticleToParticle();
+				void ParticleToWing();
+				void ParticleToWall();
+				void MoveParticles(float dt);
 			};
 		}
 	}
