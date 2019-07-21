@@ -30,7 +30,9 @@ namespace wing2d
 				CDerivativeSolver m_derivativeSolver;
 				COdeSolver m_odeSolver;
 				std::vector<glm::vec2> m_odeState;
-				std::vector<glm::vec2> m_odeNextState;
+				std::vector<glm::vec2> m_odeNextStateRude;
+				std::vector<glm::vec2> m_odeNextStatePrecise1;
+				std::vector<glm::vec2> m_odeNextStatePrecise2;
 
 				void BuildWalls();
 				void BuildWing();

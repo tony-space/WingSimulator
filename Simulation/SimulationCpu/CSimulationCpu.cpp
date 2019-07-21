@@ -37,7 +37,9 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 	BuildWing();
 
 	m_odeState.resize(m_state.particles * 2);
-	m_odeNextState.resize(m_state.particles * 2);
+	m_odeNextStateRude.resize(m_state.particles * 2);
+	m_odeNextStatePrecise1.resize(m_state.particles * 2);
+	m_odeNextStatePrecise2.resize(m_state.particles * 2);
 }
 
 float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
@@ -53,7 +55,7 @@ float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 
 void CSimulationCpu::ColorParticles(float dt)
 {
-	auto forces = boost::combine(m_odeState, m_odeNextState) | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
+	auto forces = boost::combine(m_odeState, m_odeNextStatePrecise2) | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
 	auto colors = forces | boost::adaptors::transformed([&](const auto& tuple)
 	{
 		glm::vec2 vel1;
@@ -75,10 +77,32 @@ float CSimulationCpu::Update(float dt)
 	boost::range::copy_n(m_state.pos, m_state.particles, pos1.begin());
 	boost::range::copy_n(m_state.vel, m_state.particles, vel1.begin());
 
-	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextState);
+	constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
+	constexpr float kDesiredError = 1e-3f;
+	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStateRude);
+	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise1);
+	m_odeSolver.RungeKutta(m_odeNextStatePrecise1, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise2);
 
-	auto pos2 = m_odeNextState | boost::adaptors::sliced(0, m_state.particles);
-	auto vel2 = m_odeNextState | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
+	auto combined = boost::combine(m_odeNextStateRude, m_odeNextStatePrecise2);
+	auto squares = combined | boost::adaptors::transformed([](const auto& tuple)
+	{
+		glm::vec2 a;
+		glm::vec2 b;
+		boost::tie(a, b) = tuple;
+		glm::vec2 delta = b - a;
+		return glm::dot(delta, delta);
+	});
+
+	auto error = glm::sqrt(std::accumulate(squares.begin(), squares.end(), 0.0f));
+	if (error > kDesiredError)
+	{
+		auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
+		dt *= multiplier;
+		m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
+	}
+
+	auto pos2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(0, m_state.particles);
+	auto vel2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
 	boost::range::copy_n(pos2, m_state.particles, m_state.pos.begin());
 	boost::range::copy_n(vel2, m_state.particles, m_state.vel.begin());
 
