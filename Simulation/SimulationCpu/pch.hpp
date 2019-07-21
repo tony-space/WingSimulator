@@ -2,6 +2,7 @@
 
 #include <cfloat>
 #include <cassert>
+#include <cstdint>
 
 #include <vector>
 #include <memory>

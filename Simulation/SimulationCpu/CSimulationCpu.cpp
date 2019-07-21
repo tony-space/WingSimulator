@@ -77,7 +77,9 @@ float CSimulationCpu::Update(float dt)
 	boost::range::copy_n(m_state.pos, m_state.particles, pos1.begin());
 	boost::range::copy_n(m_state.vel, m_state.particles, vel1.begin());
 
-	constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
+	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
+
+	/*constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
 	constexpr float kDesiredError = 1e-3f;
 	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStateRude);
 	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise1);
@@ -99,7 +101,7 @@ float CSimulationCpu::Update(float dt)
 		auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
 		dt *= multiplier;
 		m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
-	}
+	}*/
 
 	auto pos2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(0, m_state.particles);
 	auto vel2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);

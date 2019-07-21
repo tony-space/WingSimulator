@@ -13,6 +13,23 @@ static glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, co
 	auto force = normal * (springLen * stiffness + v * damp);
 	return force;
 }
+static inline uint64_t ExpandBy1(uint32_t val)
+{
+	uint64_t result = val;
+
+	result = ((result << 16) | result) & 0x0000FFFF0000FFFF;
+	result = ((result << 8) | result) & 0x00FF00FF00FF00FF;
+	result = ((result << 4) | result) & 0x0F0F0F0F0F0F0F0F;
+	result = ((result << 2) | result) & 0x3333333333333333;
+	result = ((result << 1) | result) & 0x5555555555555555;
+
+	return result;
+}
+
+static inline uint64_t Morton2D(uint32_t x, uint32_t y)
+{
+	return (ExpandBy1(x) << 1) | ExpandBy1(y);
+}
 
 CDerivativeSolver::CDerivativeSolver(const CSimulationCpu& sim) :
 	m_simulation(sim)
@@ -28,6 +45,7 @@ void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivati
 	m_forces.resize(particles);
 
 	ResetForces();
+	BuildTree(state);
 	ParticleToParticle(state);
 	ParticleToWing(state);
 	ParticleToWall(state);
@@ -35,11 +53,6 @@ void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivati
 
 	std::copy(state.cbegin() + particles, state.cend(), derivative.begin());
 	std::copy(m_forces.cbegin(), m_forces.cend(), derivative.begin() + particles);
-}
-
-void CDerivativeSolver::ResetForces()
-{
-	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
 }
 
 glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter)
@@ -55,6 +68,42 @@ glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2
 
 	auto force = SpringDamper(dir, vel1, vel2, springLen);
 	return force;
+}
+
+void CDerivativeSolver::BuildTree(const OdeState_t& odeState)
+{
+	m_particlesBox = CBoundingBox();
+
+	const auto& state = m_simulation.GetState();
+	const auto particles = state.particles;
+
+	auto pos = odeState | boost::adaptors::sliced(0, particles);
+	m_particlesBox.AddPoints(pos.begin(), pos.end());
+	m_sortedMortonCodes.resize(particles);
+
+	auto boxSize = m_particlesBox.max() - m_particlesBox.min();
+
+	for(size_t i = 0; i < particles; ++i)
+	{
+		const auto& p = pos[i];
+		auto normalized = (p - m_particlesBox.min()) / boxSize;
+		assert(normalized.x >= 0.0f);
+		assert(normalized.y >= 0.0f);
+		assert(normalized.x <= 1.0f);
+		assert(normalized.y <= 1.0f);
+
+		uint32_t x = uint32_t(glm::round(normalized.x * double(0xFFFFFFFF)));
+		uint32_t y = uint32_t(glm::round(normalized.y * double(0xFFFFFFFF)));
+		uint64_t morton = Morton2D(x, y);
+
+		m_sortedMortonCodes[i] = std::make_tuple(morton, i);
+	}
+
+}
+
+void CDerivativeSolver::ResetForces()
+{
+	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
 }
 
 void CDerivativeSolver::ParticleToParticle(const OdeState_t& odeState)

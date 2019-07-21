@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 #include <glm/glm.hpp>
+
+#include "CBoundingBox.hpp"
+
 
 namespace wing2d
 {
@@ -22,7 +26,12 @@ namespace wing2d
 				const CSimulationCpu& m_simulation;
 				std::vector<glm::vec2> m_forces;
 
+				CBoundingBox m_particlesBox;
+				std::vector<std::tuple<uint64_t, size_t>> m_sortedMortonCodes;
+
 				static glm::vec2 ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter);
+
+				void BuildTree(const OdeState_t& odeState);
 
 				void ResetForces();
 				void ParticleToParticle(const OdeState_t& odeState);

@@ -22,13 +22,8 @@ namespace wing2d
 						AddPoint(*it);
 				}
 
-				template <typename T>
-				void AddPoints(const T& collection)
-				{
-					auto cbegin = collection.cbegin();
-					auto cend = collection.cend();
-					AddPoints(cbegin, cend);
-				}
+				const glm::vec2& min()const { return m_min; }
+				const glm::vec2& max() const { return m_max; }
 			private:
 				glm::vec2 m_min;
 				glm::vec2 m_max;
