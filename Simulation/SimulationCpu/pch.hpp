@@ -8,9 +8,11 @@
 
 #include <algorithm>
 #include <numeric>
+#include <functional>
 
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>
+#include <boost/range/combine.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/range/algorithm_ext.hpp>
 

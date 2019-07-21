@@ -2,6 +2,8 @@
 #include "../Simulation.hpp"
 
 #include "CLineSegment.hpp"
+#include "CDerivativeSolver.hpp"
+#include "COdeSolver.hpp"
 
 namespace wing2d
 {
@@ -12,28 +14,29 @@ namespace wing2d
 			class CSimulationCpu : public ISimulation
 			{
 			public:
+				CSimulationCpu();
+
 				virtual ~CSimulationCpu() override = default;
 				virtual void ResetState(const SimulationState& state) override;
 				virtual float Update(float dt) override;
 				virtual const SimulationState& GetState() const override;
+
+				const std::vector<CLineSegment>& GetWalls() const { return m_walls; };
+				const std::vector<glm::vec2>& GetWing() const { return m_wingParticles; }
 			private:
 				wing2d::simulation::SimulationState m_state;
 				std::vector<CLineSegment> m_walls;
-				std::vector<glm::vec2> m_forces;
-
 				std::vector<glm::vec2> m_wingParticles;
+				CDerivativeSolver m_derivativeSolver;
+				COdeSolver m_odeSolver;
+				std::vector<glm::vec2> m_odeState;
+				std::vector<glm::vec2> m_odeNextState;
 
 				void BuildWalls();
 				void BuildWing();
 
-				static glm::vec2 ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter);
 				float ComputeMinDeltaTime(float requestedDt) const;
-				void ResetForces();
-				void ParticleToParticle();
-				void ParticleToWing();
-				void ParticleToWall();
-				void MoveParticles(float dt);
-				void ColorParticles();
+				void ColorParticles(float dt);
 			};
 		}
 	}

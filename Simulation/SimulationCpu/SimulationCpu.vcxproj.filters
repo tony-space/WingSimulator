@@ -6,6 +6,8 @@
     <ClInclude Include="CBoundingBox.hpp" />
     <ClInclude Include="CLineSegment.hpp" />
     <ClInclude Include="collisions.hpp" />
+    <ClInclude Include="COdeSolver.hpp" />
+    <ClInclude Include="CDerivativeSolver.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CSimulationCpu.cpp" />
@@ -13,5 +15,7 @@
     <ClCompile Include="CBoundingBox.cpp" />
     <ClCompile Include="CLineSegment.cpp" />
     <ClCompile Include="collisions.cpp" />
+    <ClCompile Include="COdeSolver.cpp" />
+    <ClCompile Include="CDerivativeSolver.cpp" />
   </ItemGroup>
 </Project>

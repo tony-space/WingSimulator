@@ -1,7 +1,10 @@
 #include "pch.hpp"
 
+//constexpr size_t kParticles = 256;
+//constexpr float kParticleRad = 0.005f;
+
 constexpr size_t kParticles = 256;
-constexpr float kParticleRad = 0.005f;
+constexpr float kParticleRad = 0.01f;
 
 class CSmartFile
 {

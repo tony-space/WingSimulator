@@ -4,15 +4,6 @@
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::cpu;
 
-glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, const glm::vec2& vel2, float springLen)
-{
-	constexpr float stiffness = 20000.0f;
-	constexpr float damp = 50.0f;
-	auto v = glm::dot(vel1 - vel2, normal);
-	auto force = normal * (springLen * stiffness + v * damp);
-	return force;
-}
-
 glm::vec4 getHeatMapColor(float value)
 {
 	value = fminf(fmaxf(value, 0.0f), 1.0f);
@@ -31,17 +22,22 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 	return std::make_unique<CSimulationCpu>();
 }
 
+CSimulationCpu::CSimulationCpu() : m_derivativeSolver(*this)
+{
+
+}
+
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	if (!state.IsValid())
 		throw std::runtime_error("state is invalid");
 
 	m_state = state;
-	m_walls.clear();
 	BuildWalls();
 	BuildWing();
 
-	m_forces.resize(m_state.particles);
+	m_odeState.resize(m_state.particles * 2);
+	m_odeNextState.resize(m_state.particles * 2);
 }
 
 float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
@@ -55,114 +51,39 @@ float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 	return std::reduce(timeRange.begin(), timeRange.end(), requestedDt, [](auto t1, auto t2) {return t1 < t2 ? t1 : t2; });
 }
 
-void CSimulationCpu::ResetForces()
+void CSimulationCpu::ColorParticles(float dt)
 {
-	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
-}
-
-glm::vec2 CSimulationCpu::ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter)
-{
-	auto deltaPos = pos2 - pos1;
-	auto distSq = glm::dot(deltaPos, deltaPos);
-	if (distSq > (diameter * diameter))
-		return glm::vec2(0.0f);
-
-	auto dist = glm::sqrt(distSq);
-	auto dir = deltaPos / dist;
-	auto springLen = diameter - dist;
-
-	auto force = SpringDamper(dir, vel1, vel2, springLen);
-	return force;
-}
-
-void CSimulationCpu::ParticleToParticle()
-{
-	const auto diameter = m_state.particleRad * 2.0f;
-
-	for (size_t i = 0; i < m_state.particles - 1; ++i)
+	auto forces = boost::combine(m_odeState, m_odeNextState) | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
+	auto colors = forces | boost::adaptors::transformed([&](const auto& tuple)
 	{
-		const auto &p1 = m_state.pos[i];
-		const auto &v1 = m_state.vel[i];
+		glm::vec2 vel1;
+		glm::vec2 vel2;
+		boost::tie(vel1, vel2) = tuple;
+		auto force = (vel2 - vel1) / dt;
+		return getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 10.0f + 0.15f);
+	});
 
-		for (size_t j = i + 1; j < m_state.particles; ++j)
-		{
-			const auto& p2 = m_state.pos[j];
-			const auto& v2 = m_state.vel[j];
-			auto force = ComputeForce(p1, v1, p2, v2, diameter);
-			m_forces[i] -= force;
-			m_forces[j] += force;
-		}
-	}
-}
-
-void CSimulationCpu::ParticleToWing()
-{
-	const auto diameter = m_state.particleRad * 2.0f;
-
-	for (size_t i = 0; i < m_state.particles; ++i)
-	{
-		const auto &p = m_state.pos[i];
-		const auto &v = m_state.vel[i];
-
-		for (const auto& wp : m_wingParticles)
-		{
-			m_forces[i] -= ComputeForce(p, v, wp, glm::vec2(0.0f), diameter);
-		}
-	}
-}
-
-void CSimulationCpu::ParticleToWall()
-{
-	for (size_t i = 0; i < m_state.particles; ++i)
-	{
-		const auto &p = m_state.pos[i];
-		const auto &v = m_state.vel[i];
-
-		for (const auto& w : m_walls)
-		{
-			auto d = w.DistanceToLine(p) - m_state.particleRad;
-			if (d < 0.0f && glm::dot(w.normal(), p) < 0.0f)
-			{
-				auto force = SpringDamper(w.normal(), v, glm::vec2(0.0f), d);
-				m_forces[i] -= force;
-			}
-		}
-	}
-}
-
-void CSimulationCpu::MoveParticles(float dt)
-{
-	for (size_t i = 0; i < m_state.particles; ++i)
-	{
-		auto &p = m_state.pos[i];
-		auto &v = m_state.vel[i];
-		auto &f = m_forces[i];
-
-		f.y -= 0.5f;
-		p += v * dt;
-		v += f * dt;
-	}
-}
-
-void CSimulationCpu::ColorParticles()
-{
-	for (size_t i = 0; i < m_state.particles; ++i)
-	{
-		const auto& force = m_forces[i];
-		m_state.color[i] = getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 8.0f + 0.15f);
-	}
+	boost::range::copy_n(colors, m_state.particles, m_state.color.begin());
 }
 
 float CSimulationCpu::Update(float dt)
 {
 	dt = ComputeMinDeltaTime(dt);
 
-	ResetForces();
-	ParticleToParticle();
-	ParticleToWing();
-	ParticleToWall();
-	MoveParticles(dt);
-	ColorParticles();
+	auto pos1 = m_odeState | boost::adaptors::sliced(0, m_state.particles);
+	auto vel1 = m_odeState | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
+	boost::range::copy_n(m_state.pos, m_state.particles, pos1.begin());
+	boost::range::copy_n(m_state.vel, m_state.particles, vel1.begin());
+
+	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextState);
+
+	auto pos2 = m_odeNextState | boost::adaptors::sliced(0, m_state.particles);
+	auto vel2 = m_odeNextState | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
+	boost::range::copy_n(pos2, m_state.particles, m_state.pos.begin());
+	boost::range::copy_n(vel2, m_state.particles, m_state.vel.begin());
+
+	ColorParticles(dt);
+
 	return dt;
 }
 
@@ -179,6 +100,7 @@ void CSimulationCpu::BuildWalls()
 	glm::vec2 bottomRight(corner.x, -corner.y);
 	glm::vec2 bottomLeft(-corner.x, -corner.y);
 
+	m_walls.clear();
 	m_walls.emplace_back(topLeft, topRight);
 	m_walls.emplace_back(topRight, bottomRight);
 	m_walls.emplace_back(bottomRight, bottomLeft);
