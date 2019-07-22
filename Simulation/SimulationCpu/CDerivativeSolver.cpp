@@ -42,13 +42,14 @@ void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivati
 	if (state.size() != particles * 2 || derivative.size() != particles * 2)
 		throw std::runtime_error("incorrect state/derivative size");
 
+	m_odeState = &state;
 	m_forces.resize(particles);
 
 	ResetForces();
-	BuildTree(state);
-	ParticleToParticle(state);
-	ParticleToWing(state);
-	ParticleToWall(state);
+	BuildTree();
+	ParticleToParticle();
+	ParticleToWing();
+	ParticleToWall();
 	ApplyGravity();
 
 	std::copy(state.cbegin() + particles, state.cend(), derivative.begin());
@@ -70,20 +71,60 @@ glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2
 	return force;
 }
 
-void CDerivativeSolver::BuildTree(const OdeState_t& odeState)
+//https://en.wikipedia.org/wiki/Find_first_set#CLZ
+//count leading zeroes
+#define clz64 __lzcnt64
+
+size_t wing2d::simulation::cpu::CDerivativeSolver::FindSplit(const MortonCode_t* sortedMortonCodes, size_t first, size_t last)
+{
+	// Identical Morton codes => split the range in the middle.
+	auto firstCode = std::get<0>(sortedMortonCodes[first]);
+	auto lastCode = std::get<0>(sortedMortonCodes[last]);
+
+	if (firstCode == lastCode)
+		return (first + last) >> 1;
+
+	// Calculate the number of highest bits that are the same
+	// for all objects, using the count-leading-zeros intrinsic.
+	auto commonPrefix = clz64(firstCode ^ lastCode);
+
+	// Use binary search to find where the next bit differs.
+	// Specifically, we are looking for the highest object that
+	// shares more than commonPrefix bits with the first one.
+	auto split = first; // initial guess
+	auto step = last - first;
+
+	do
+	{
+		step = (step + 1) >> 1; // exponential decrease
+		auto newSplit = split + step; // proposed new position
+
+		if (newSplit < last)
+		{
+			auto splitCode = std::get<0>(sortedMortonCodes[newSplit]);
+			auto splitPrefix = clz64(firstCode ^ splitCode);
+			if (splitPrefix > commonPrefix)
+				split = newSplit; // accept proposal
+		}
+	} while (step > 1);
+
+	return split;
+}
+
+void CDerivativeSolver::BuildTree()
 {
 	m_particlesBox = CBoundingBox();
 
 	const auto& state = m_simulation.GetState();
 	const auto particles = state.particles;
 
-	auto pos = odeState | boost::adaptors::sliced(0, particles);
+	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
 	m_particlesBox.AddPoints(pos.begin(), pos.end());
 	m_sortedMortonCodes.resize(particles);
 
 	auto boxSize = m_particlesBox.max() - m_particlesBox.min();
 
-	for(size_t i = 0; i < particles; ++i)
+	for (size_t i = 0; i < particles; ++i)
 	{
 		const auto& p = pos[i];
 		auto normalized = (p - m_particlesBox.min()) / boxSize;
@@ -99,6 +140,31 @@ void CDerivativeSolver::BuildTree(const OdeState_t& odeState)
 		m_sortedMortonCodes[i] = std::make_tuple(morton, i);
 	}
 
+	std::sort(m_sortedMortonCodes.begin(), m_sortedMortonCodes.end(), [](const auto& t1, const auto& t2)
+	{
+		return std::get<0>(t1) < std::get<0>(t2);
+	});
+
+	m_internalNodesPool.clear();
+	m_leafNodesPool.clear();
+
+	m_treeRoot = GenerateHierarchy(m_sortedMortonCodes.data(), 0, m_sortedMortonCodes.size() - 1);
+}
+
+const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchy(const MortonCode_t* sortedMortonCodes, size_t first, size_t last)
+{
+	if (first == last)
+		return &m_leafNodesPool.emplace_back(this, sortedMortonCodes[first]);
+
+	// Determine where to split the range.
+
+	auto splitIdx = FindSplit(sortedMortonCodes, first, last);
+
+	// Process the resulting sub-ranges recursively.
+
+	auto childA = GenerateHierarchy(sortedMortonCodes, first, splitIdx);
+	auto childB = GenerateHierarchy(sortedMortonCodes, splitIdx + 1, last);
+	return &m_internalNodesPool.emplace_back(childA, childB);
 }
 
 void CDerivativeSolver::ResetForces()
@@ -106,13 +172,13 @@ void CDerivativeSolver::ResetForces()
 	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
 }
 
-void CDerivativeSolver::ParticleToParticle(const OdeState_t& odeState)
+void CDerivativeSolver::ParticleToParticle()
 {
 	const auto& state = m_simulation.GetState();
 	const auto particles = state.particles;
 
-	auto pos = odeState | boost::adaptors::sliced(0, particles);
-	auto vel = odeState | boost::adaptors::sliced(particles, particles * 2);
+	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
+	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
 	const auto diameter = state.particleRad * 2.0f;
 
 	for (size_t i = 0; i < particles - 1; ++i)
@@ -131,14 +197,14 @@ void CDerivativeSolver::ParticleToParticle(const OdeState_t& odeState)
 	}
 }
 
-void CDerivativeSolver::ParticleToWing(const OdeState_t& odeState)
+void CDerivativeSolver::ParticleToWing()
 {
 	const auto& state = m_simulation.GetState();
 	const auto& wingParticles = m_simulation.GetWing();
 	const auto particles = state.particles;
 
-	auto pos = odeState | boost::adaptors::sliced(0, particles);
-	auto vel = odeState | boost::adaptors::sliced(particles, particles * 2);
+	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
+	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
 	const auto diameter = state.particleRad * 2.0f;
 
 	for (size_t i = 0; i < particles; ++i)
@@ -153,14 +219,14 @@ void CDerivativeSolver::ParticleToWing(const OdeState_t& odeState)
 	}
 }
 
-void CDerivativeSolver::ParticleToWall(const OdeState_t& odeState)
+void CDerivativeSolver::ParticleToWall()
 {
 	const auto& state = m_simulation.GetState();
 	const auto& walls = m_simulation.GetWalls();
 	const auto particles = state.particles;
 
-	auto pos = odeState | boost::adaptors::sliced(0, particles);
-	auto vel = odeState | boost::adaptors::sliced(particles, particles * 2);
+	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
+	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
 	for (size_t i = 0; i < particles; ++i)
 	{
 		const auto &p = pos[i];
@@ -182,4 +248,33 @@ void CDerivativeSolver::ApplyGravity()
 {
 	for (auto& f : m_forces)
 		f.y -= 0.5f;
+}
+
+CDerivativeSolver::SLeafNode::SLeafNode(const CDerivativeSolver* solver, const MortonCode_t & obj) : object(obj)
+{
+	auto rad = solver->m_simulation.GetState().particleRad;
+
+	auto idx = std::get<1>(obj);
+	auto pos = (*solver->m_odeState)[idx];
+
+	box.AddPoint(glm::vec2(pos.x - rad, pos.y - rad));
+	box.AddPoint(glm::vec2(pos.x + rad, pos.y + rad));
+}
+
+bool CDerivativeSolver::SLeafNode::IsLeaf() const
+{
+	return true;
+}
+
+CDerivativeSolver::SInternalNode::SInternalNode(const AbstractNode * l, const AbstractNode * r) : left(l), right(r)
+{
+	box.AddPoint(left->box.min());
+	box.AddPoint(left->box.max());
+	box.AddPoint(right->box.min());
+	box.AddPoint(right->box.max());
+}
+
+bool CDerivativeSolver::SInternalNode::IsLeaf() const
+{
+	return false;
 }
