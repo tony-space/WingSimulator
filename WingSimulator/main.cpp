@@ -1,10 +1,10 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 23;
-constexpr float kParticleRad = 0.005f;
+//constexpr size_t kParticles = 1024;
+//constexpr float kParticleRad = 0.005f;
 
-//constexpr size_t kParticles = 256;
-//constexpr float kParticleRad = 0.01f;
+constexpr size_t kParticles = 2048;
+constexpr float kParticleRad = 0.01f;
 
 class CSmartFile
 {
@@ -88,13 +88,15 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 
 	for (size_t i = 0; i < kParticles; ++i)
 	{
-		state.pos[i].x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
-		state.pos[i].y = glm::linearRand(0.25f, 1.0f);
+		//state.pos[i].x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
+		//state.pos[i].y = glm::linearRand(0.25f, 1.0f);
+		state.pos[i].x = glm::linearRand(-0.5f, 0.5f);
+		state.pos[i].y = glm::linearRand(-0.25f, 1.0f);
 	}
 
 	glm::mat3 modelMat = glm::identity<glm::mat3>();
-	//modelMat = glm::translate(modelMat, glm::vec2(-0.5f, -0.5f));
-	modelMat = glm::rotate(modelMat, -3.1415f / 2.0f);
+	modelMat = glm::translate(modelMat, glm::vec2(-0.5f, -0.5f));
+	//modelMat = glm::rotate(modelMat, -3.1415f / 2.0f);
 
 	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [&](const auto& a) -> glm::vec2
 	{

@@ -2,11 +2,9 @@
 
 #include <cstdint>
 #include <vector>
-#include <deque>
 #include <glm/glm.hpp>
 
 #include "CBoundingBox.hpp"
-
 
 namespace wing2d
 {
@@ -24,17 +22,7 @@ namespace wing2d
 				CDerivativeSolver(const CSimulationCpu& sim);
 				void operator() (const OdeState_t& odeState, OdeState_t& odeDerivative);
 			private:
-				const CSimulationCpu& m_simulation;
-				const OdeState_t* m_odeState = nullptr;
-				std::vector<glm::vec2> m_forces;
-
-				CBoundingBox m_particlesBox;
 				typedef std::tuple<uint64_t, size_t> MortonCode_t;
-				std::vector<MortonCode_t> m_sortedMortonCodes;
-
-				static glm::vec2 ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter);
-				static size_t FindSplit(const MortonCode_t* sortedMortonCodes, size_t first, size_t last);
-
 				struct AbstractNode
 				{
 					CBoundingBox box;
@@ -64,18 +52,28 @@ namespace wing2d
 					virtual bool IsLeaf() const override;
 				};
 
-				std::deque<SLeafNode> m_leafNodesPool;
-				std::deque<SInternalNode> m_internalNodesPool;
+				const CSimulationCpu& m_simulation;
+				const OdeState_t* m_odeState = nullptr;
+
+				std::vector<glm::vec2> m_forces;
+				std::vector<MortonCode_t> m_sortedMortonCodes;
+				std::vector<SLeafNode> m_leafNodesPool;
+				std::vector<SInternalNode> m_internalNodesPool;
 				const AbstractNode* m_treeRoot = nullptr;
+				std::vector<size_t> m_potentialCollisionsList;
+
+				size_t FindSplit(size_t first, size_t last) const;
+				const AbstractNode* GenerateHierarchy(size_t first, size_t last);
+				void TraverseRecursive(size_t sortedIndex, const AbstractNode* node);
 
 				void BuildTree();
-				const AbstractNode* GenerateHierarchy(const MortonCode_t* sortedMortonCodes, size_t first, size_t last);
-
 				void ResetForces();
 				void ParticleToParticle();
 				void ParticleToWing();
 				void ParticleToWall();
 				void ApplyGravity();
+
+				static glm::vec2 ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter);
 			};
 		}
 	}

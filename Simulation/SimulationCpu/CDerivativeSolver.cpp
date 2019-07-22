@@ -72,14 +72,17 @@ glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2
 }
 
 //https://en.wikipedia.org/wiki/Find_first_set#CLZ
-//count leading zeroes
-#define clz64 __lzcnt64
+//count leading zeros
+size_t clz64(uint64_t value)
+{
+	return 63 - size_t(glm::floor(glm::log(value) / glm::log(2)));
+}
 
-size_t wing2d::simulation::cpu::CDerivativeSolver::FindSplit(const MortonCode_t* sortedMortonCodes, size_t first, size_t last)
+size_t CDerivativeSolver::FindSplit(size_t first, size_t last) const
 {
 	// Identical Morton codes => split the range in the middle.
-	auto firstCode = std::get<0>(sortedMortonCodes[first]);
-	auto lastCode = std::get<0>(sortedMortonCodes[last]);
+	auto firstCode = std::get<0>(m_sortedMortonCodes[first]);
+	auto lastCode = std::get<0>(m_sortedMortonCodes[last]);
 
 	if (firstCode == lastCode)
 		return (first + last) >> 1;
@@ -101,7 +104,7 @@ size_t wing2d::simulation::cpu::CDerivativeSolver::FindSplit(const MortonCode_t*
 
 		if (newSplit < last)
 		{
-			auto splitCode = std::get<0>(sortedMortonCodes[newSplit]);
+			auto splitCode = std::get<0>(m_sortedMortonCodes[newSplit]);
 			auto splitPrefix = clz64(firstCode ^ splitCode);
 			if (splitPrefix > commonPrefix)
 				split = newSplit; // accept proposal
@@ -111,23 +114,34 @@ size_t wing2d::simulation::cpu::CDerivativeSolver::FindSplit(const MortonCode_t*
 	return split;
 }
 
+const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchy(size_t first, size_t last)
+{
+	if (first == last)
+		return &m_leafNodesPool.emplace_back(this, m_sortedMortonCodes[first]);
+
+	// Determine where to split the range.
+	auto splitIdx = FindSplit(first, last);
+
+	// Process the resulting sub-ranges recursively.
+	auto childA = GenerateHierarchy(first, splitIdx);
+	auto childB = GenerateHierarchy(splitIdx + 1, last);
+	return &m_internalNodesPool.emplace_back(childA, childB);
+}
+
 void CDerivativeSolver::BuildTree()
 {
-	m_particlesBox = CBoundingBox();
+	CBoundingBox particlesBox;
 
 	const auto& state = m_simulation.GetState();
 	const auto particles = state.particles;
 
 	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
-	m_particlesBox.AddPoints(pos.begin(), pos.end());
+	particlesBox.AddPoints(pos.begin(), pos.end());
 	m_sortedMortonCodes.resize(particles);
-
-	auto boxSize = m_particlesBox.max() - m_particlesBox.min();
-
 	for (size_t i = 0; i < particles; ++i)
 	{
 		const auto& p = pos[i];
-		auto normalized = (p - m_particlesBox.min()) / boxSize;
+		auto normalized = (p - particlesBox.min()) / particlesBox.size();
 		assert(normalized.x >= 0.0f);
 		assert(normalized.y >= 0.0f);
 		assert(normalized.x <= 1.0f);
@@ -148,28 +162,38 @@ void CDerivativeSolver::BuildTree()
 	m_internalNodesPool.clear();
 	m_leafNodesPool.clear();
 
-	m_treeRoot = GenerateHierarchy(m_sortedMortonCodes.data(), 0, m_sortedMortonCodes.size() - 1);
-}
+	m_internalNodesPool.reserve(particles - 1);
+	m_leafNodesPool.reserve(particles);
 
-const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchy(const MortonCode_t* sortedMortonCodes, size_t first, size_t last)
-{
-	if (first == last)
-		return &m_leafNodesPool.emplace_back(this, sortedMortonCodes[first]);
-
-	// Determine where to split the range.
-
-	auto splitIdx = FindSplit(sortedMortonCodes, first, last);
-
-	// Process the resulting sub-ranges recursively.
-
-	auto childA = GenerateHierarchy(sortedMortonCodes, first, splitIdx);
-	auto childB = GenerateHierarchy(sortedMortonCodes, splitIdx + 1, last);
-	return &m_internalNodesPool.emplace_back(childA, childB);
+	m_treeRoot = GenerateHierarchy(0, particles - 1);
 }
 
 void CDerivativeSolver::ResetForces()
 {
 	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
+}
+
+void CDerivativeSolver::TraverseRecursive(size_t sortedIndex, const AbstractNode* node)
+{
+	const auto& nodeBox = m_leafNodesPool[sortedIndex].box;
+	if (!nodeBox.Overlaps(node->box))
+		return;
+
+	if (node->IsLeaf())
+	{
+		if (&m_leafNodesPool[sortedIndex] != node)
+		{
+			auto leaf = static_cast<const SLeafNode*>(node);
+			auto objectIdx = std::get<1>(leaf->object);
+			m_potentialCollisionsList.push_back(objectIdx);
+		}
+	}
+	else
+	{
+		auto internalNode = static_cast<const SInternalNode*>(node);
+		TraverseRecursive(sortedIndex, internalNode->left);
+		TraverseRecursive(sortedIndex, internalNode->right);
+	}
 }
 
 void CDerivativeSolver::ParticleToParticle()
@@ -181,18 +205,27 @@ void CDerivativeSolver::ParticleToParticle()
 	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
 	const auto diameter = state.particleRad * 2.0f;
 
-	for (size_t i = 0; i < particles - 1; ++i)
+	for (size_t sortedIdx = 0; sortedIdx < particles; ++sortedIdx)
 	{
-		const auto& p1 = pos[i];
-		const auto& v1 = vel[i];
+		m_potentialCollisionsList.clear();
 
-		for (size_t j = i + 1; j < state.particles; ++j)
+		auto index = std::get<1>(m_sortedMortonCodes[sortedIdx]);
+		TraverseRecursive(sortedIdx, m_treeRoot);
+
+		if(m_potentialCollisionsList.empty())
+			continue;
+
+		const auto& p1 = pos[index];
+		const auto& v1 = vel[index];
+
+		for (size_t otherObjectIdx : m_potentialCollisionsList)
 		{
-			const auto& p2 = pos[j];
-			const auto& v2 = vel[j];
+			const auto& p2 = pos[otherObjectIdx];
+			const auto& v2 = vel[otherObjectIdx];
+
 			auto force = ComputeForce(p1, v1, p2, v2, diameter);
-			m_forces[i] -= force;
-			m_forces[j] += force;
+			m_forces[index] -= force;
+			m_forces[otherObjectIdx] += force;
 		}
 	}
 }

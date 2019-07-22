@@ -5,12 +5,12 @@
 #include <cstdint>
 
 #include <vector>
-#include <deque>
 #include <memory>
 
 #include <algorithm>
 #include <numeric>
 #include <functional>
+#include <optional>
 
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>
