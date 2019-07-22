@@ -35,6 +35,7 @@ namespace wing2d
 					const MortonCode_t& object;
 
 					SLeafNode(const CDerivativeSolver* solver, const MortonCode_t& obj);
+					SLeafNode(const std::vector<glm::vec2>& wing, float rad, const MortonCode_t& obj);
 					SLeafNode(const SLeafNode&) = default;
 					SLeafNode(SLeafNode&&) = default;
 
@@ -63,10 +64,12 @@ namespace wing2d
 				std::vector<size_t> m_potentialCollisionsList;
 
 				size_t FindSplit(size_t first, size_t last) const;
-				const AbstractNode* GenerateHierarchy(size_t first, size_t last);
-				void TraverseRecursive(size_t sortedIndex, const AbstractNode* node);
+				const AbstractNode* GenerateHierarchyParticles(size_t first, size_t last);
+				const AbstractNode* GenerateHierarchyWing(size_t first, size_t last);
+				void TraverseRecursive(const AbstractNode* subtreeRoot, const CBoundingBox& queryBox, const SLeafNode* self = nullptr);
 
-				void BuildTree();
+				void BuildTreeForParticleToParticle();
+				void BuildTreeForParticleToWing();
 				void ResetForces();
 				void ParticleToParticle();
 				void ParticleToWing();

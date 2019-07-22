@@ -46,7 +46,6 @@ void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivati
 	m_forces.resize(particles);
 
 	ResetForces();
-	BuildTree();
 	ParticleToParticle();
 	ParticleToWing();
 	ParticleToWall();
@@ -114,7 +113,7 @@ size_t CDerivativeSolver::FindSplit(size_t first, size_t last) const
 	return split;
 }
 
-const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchy(size_t first, size_t last)
+const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchyParticles(size_t first, size_t last)
 {
 	if (first == last)
 		return &m_leafNodesPool.emplace_back(this, m_sortedMortonCodes[first]);
@@ -123,12 +122,26 @@ const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchy(size
 	auto splitIdx = FindSplit(first, last);
 
 	// Process the resulting sub-ranges recursively.
-	auto childA = GenerateHierarchy(first, splitIdx);
-	auto childB = GenerateHierarchy(splitIdx + 1, last);
+	auto childA = GenerateHierarchyParticles(first, splitIdx);
+	auto childB = GenerateHierarchyParticles(splitIdx + 1, last);
 	return &m_internalNodesPool.emplace_back(childA, childB);
 }
 
-void CDerivativeSolver::BuildTree()
+const CDerivativeSolver::AbstractNode* CDerivativeSolver::GenerateHierarchyWing(size_t first, size_t last)
+{
+	if (first == last)
+		return &m_leafNodesPool.emplace_back(m_simulation.GetWing(), m_simulation.GetState().particleRad, m_sortedMortonCodes[first]);
+
+	// Determine where to split the range.
+	auto splitIdx = FindSplit(first, last);
+
+	// Process the resulting sub-ranges recursively.
+	auto childA = GenerateHierarchyWing(first, splitIdx);
+	auto childB = GenerateHierarchyWing(splitIdx + 1, last);
+	return &m_internalNodesPool.emplace_back(childA, childB);
+}
+
+void CDerivativeSolver::BuildTreeForParticleToParticle()
 {
 	CBoundingBox particlesBox;
 
@@ -165,7 +178,46 @@ void CDerivativeSolver::BuildTree()
 	m_internalNodesPool.reserve(particles - 1);
 	m_leafNodesPool.reserve(particles);
 
-	m_treeRoot = GenerateHierarchy(0, particles - 1);
+	m_treeRoot = GenerateHierarchyParticles(0, particles - 1);
+}
+
+void CDerivativeSolver::BuildTreeForParticleToWing()
+{
+	CBoundingBox wingParticlesBox;
+
+	const auto& wingParticles = m_simulation.GetWing();
+	const auto particlesCount = wingParticles.size();
+	wingParticlesBox.AddPoints(wingParticles.begin(), wingParticles.end());
+
+	m_sortedMortonCodes.resize(particlesCount);
+	for (size_t i = 0; i < particlesCount; ++i)
+	{
+		const auto& p = wingParticles[i];
+		auto normalized = (p - wingParticlesBox.min()) / wingParticlesBox.size();
+		assert(normalized.x >= 0.0f);
+		assert(normalized.y >= 0.0f);
+		assert(normalized.x <= 1.0f);
+		assert(normalized.y <= 1.0f);
+
+		uint32_t x = uint32_t(glm::round(normalized.x * double(0xFFFFFFFF)));
+		uint32_t y = uint32_t(glm::round(normalized.y * double(0xFFFFFFFF)));
+		uint64_t morton = Morton2D(x, y);
+
+		m_sortedMortonCodes[i] = std::make_tuple(morton, i);
+	}
+
+	std::sort(m_sortedMortonCodes.begin(), m_sortedMortonCodes.end(), [](const auto& t1, const auto& t2)
+	{
+		return std::get<0>(t1) < std::get<0>(t2);
+	});
+
+	m_internalNodesPool.clear();
+	m_leafNodesPool.clear();
+
+	m_internalNodesPool.reserve(particlesCount - 1);
+	m_leafNodesPool.reserve(particlesCount);
+
+	m_treeRoot = GenerateHierarchyWing(0, particlesCount - 1);
 }
 
 void CDerivativeSolver::ResetForces()
@@ -173,26 +225,25 @@ void CDerivativeSolver::ResetForces()
 	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
 }
 
-void CDerivativeSolver::TraverseRecursive(size_t sortedIndex, const AbstractNode* node)
+void CDerivativeSolver::TraverseRecursive(const AbstractNode* subtreeRoot, const CBoundingBox& queryBox, const SLeafNode* self)
 {
-	const auto& nodeBox = m_leafNodesPool[sortedIndex].box;
-	if (!nodeBox.Overlaps(node->box))
+	if (!queryBox.Overlaps(subtreeRoot->box))
 		return;
 
-	if (node->IsLeaf())
+	if (subtreeRoot->IsLeaf())
 	{
-		if (&m_leafNodesPool[sortedIndex] != node)
-		{
-			auto leaf = static_cast<const SLeafNode*>(node);
-			auto objectIdx = std::get<1>(leaf->object);
-			m_potentialCollisionsList.push_back(objectIdx);
-		}
+		if (self == subtreeRoot)
+			return;
+
+		auto leaf = static_cast<const SLeafNode*>(subtreeRoot);
+		auto objectIdx = std::get<1>(leaf->object);
+		m_potentialCollisionsList.push_back(objectIdx);
 	}
 	else
 	{
-		auto internalNode = static_cast<const SInternalNode*>(node);
-		TraverseRecursive(sortedIndex, internalNode->left);
-		TraverseRecursive(sortedIndex, internalNode->right);
+		auto internalNode = static_cast<const SInternalNode*>(subtreeRoot);
+		TraverseRecursive(internalNode->left, queryBox, self);
+		TraverseRecursive(internalNode->right, queryBox, self);
 	}
 }
 
@@ -205,12 +256,15 @@ void CDerivativeSolver::ParticleToParticle()
 	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
 	const auto diameter = state.particleRad * 2.0f;
 
+	BuildTreeForParticleToParticle();
+
 	for (size_t sortedIdx = 0; sortedIdx < particles; ++sortedIdx)
 	{
 		m_potentialCollisionsList.clear();
 
 		auto index = std::get<1>(m_sortedMortonCodes[sortedIdx]);
-		TraverseRecursive(sortedIdx, m_treeRoot);
+		const auto& self = m_leafNodesPool[sortedIdx];
+		TraverseRecursive(m_treeRoot, self.box, &self);
 
 		if(m_potentialCollisionsList.empty())
 			continue;
@@ -232,21 +286,33 @@ void CDerivativeSolver::ParticleToParticle()
 
 void CDerivativeSolver::ParticleToWing()
 {
+	BuildTreeForParticleToWing();
 	const auto& state = m_simulation.GetState();
 	const auto& wingParticles = m_simulation.GetWing();
 	const auto particles = state.particles;
 
 	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
 	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
-	const auto diameter = state.particleRad * 2.0f;
+	const auto rad = state.particleRad;
+	const auto diameter = rad * 2.0f;
 
 	for (size_t i = 0; i < particles; ++i)
 	{
+		m_potentialCollisionsList.clear();
+
 		const auto &p = pos[i];
 		const auto &v = vel[i];
+		CBoundingBox box;
+		box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
+		box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
 
-		for (const auto& wp : wingParticles)
+		TraverseRecursive(m_treeRoot, box);
+		if (m_potentialCollisionsList.empty())
+			continue;
+
+		for (size_t wingIdx : m_potentialCollisionsList)
 		{
+			const auto& wp = wingParticles[wingIdx];
 			m_forces[i] -= ComputeForce(p, v, wp, glm::vec2(0.0f), diameter);
 		}
 	}
@@ -289,6 +355,15 @@ CDerivativeSolver::SLeafNode::SLeafNode(const CDerivativeSolver* solver, const M
 
 	auto idx = std::get<1>(obj);
 	auto pos = (*solver->m_odeState)[idx];
+
+	box.AddPoint(glm::vec2(pos.x - rad, pos.y - rad));
+	box.AddPoint(glm::vec2(pos.x + rad, pos.y + rad));
+}
+
+CDerivativeSolver::SLeafNode::SLeafNode(const std::vector<glm::vec2>& wing, float rad, const MortonCode_t& obj) : object(obj)
+{
+	auto idx = std::get<1>(obj);
+	const auto& pos = wing[idx];
 
 	box.AddPoint(glm::vec2(pos.x - rad, pos.y - rad));
 	box.AddPoint(glm::vec2(pos.x + rad, pos.y + rad));

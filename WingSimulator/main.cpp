@@ -1,10 +1,10 @@
 #include "pch.hpp"
 
-//constexpr size_t kParticles = 1024;
-//constexpr float kParticleRad = 0.005f;
+constexpr size_t kParticles = 4096;
+constexpr float kParticleRad = 0.005f;
 
-constexpr size_t kParticles = 2048;
-constexpr float kParticleRad = 0.01f;
+//constexpr size_t kParticles = 2048;
+//constexpr float kParticleRad = 0.01f;
 
 class CSmartFile
 {
@@ -122,10 +122,12 @@ int main(int argc, char** argv)
 
 		SetupState(simulation.get(), LoadAirfoil(argv[1]));
 
+		float dt = 0.001f;
+
 		renderer->SetOnUpdate([&]()
 		{
 			renderer->RenderAsync(simulation->GetState());
-			float t = simulation->Update(0.01f);
+			dt = simulation->Update(dt);
 		});
 
 		//renderer->InitWindowLoop(1920, 1080, true);

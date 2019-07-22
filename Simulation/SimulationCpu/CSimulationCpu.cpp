@@ -47,7 +47,7 @@ float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 	auto timeRange = m_state.vel | boost::adaptors::transformed([&](const auto& v)
 	{
 		auto vel = glm::length(v);
-		auto halfRadDt = m_state.particleRad * 0.5f / vel;
+		auto halfRadDt = m_state.particleRad / vel;
 		return std::min(halfRadDt, requestedDt);
 	});
 	return std::reduce(timeRange.begin(), timeRange.end(), requestedDt, [](auto t1, auto t2) {return t1 < t2 ? t1 : t2; });
@@ -80,7 +80,7 @@ float CSimulationCpu::Update(float dt)
 	//m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
 
 	constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
-	constexpr float kDesiredError = 1e-3f;
+	constexpr float kDesiredError = 1e-1f;
 	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStateRude);
 	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise1);
 	m_odeSolver.RungeKutta(m_odeNextStatePrecise1, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise2);
@@ -96,11 +96,11 @@ float CSimulationCpu::Update(float dt)
 	});
 
 	auto error = glm::sqrt(std::accumulate(squares.begin(), squares.end(), 0.0f));
-	if (error > kDesiredError)
+	//if (error > kDesiredError)
 	{
 		auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
 		dt *= multiplier;
-		m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
+		//m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
 	}
 
 	auto pos2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(0, m_state.particles);
