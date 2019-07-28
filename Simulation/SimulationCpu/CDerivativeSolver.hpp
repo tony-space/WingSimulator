@@ -23,32 +23,29 @@ namespace wing2d
 				void operator() (const OdeState_t& odeState, OdeState_t& odeDerivative);
 			private:
 				typedef std::tuple<uint64_t, size_t> MortonCode_t;
-				struct AbstractNode
+				struct SAbstractNode
 				{
 					CBoundingBox box;
 
+					SAbstractNode* parent = nullptr;
+
 					virtual bool IsLeaf() const = 0;
-					virtual ~AbstractNode() {}
+					virtual ~SAbstractNode() {}
 				};
-				struct SLeafNode : AbstractNode
+				struct SLeafNode : SAbstractNode
 				{
 					const MortonCode_t& object;
 
-					SLeafNode(const CDerivativeSolver* solver, const MortonCode_t& obj);
-					SLeafNode(const std::vector<glm::vec2>& wing, float rad, const MortonCode_t& obj);
-					SLeafNode(const SLeafNode&) = default;
-					SLeafNode(SLeafNode&&) = default;
+					SLeafNode(const MortonCode_t& obj) : object(obj)
+					{
+					}
 
 					virtual bool IsLeaf() const override;
 				};
-				struct SInternalNode : AbstractNode
+				struct SInternalNode : SAbstractNode
 				{
-					const AbstractNode* left = nullptr;
-					const AbstractNode* right = nullptr;
-
-					SInternalNode(const AbstractNode* l, const AbstractNode* r);
-					SInternalNode(const SInternalNode&) = default;
-					SInternalNode(SInternalNode&&) = default;
+					SAbstractNode* left = nullptr;
+					SAbstractNode* right = nullptr;
 
 					virtual bool IsLeaf() const override;
 				};
@@ -60,16 +57,19 @@ namespace wing2d
 				std::vector<MortonCode_t> m_sortedMortonCodes;
 				std::vector<SLeafNode> m_leafNodesPool;
 				std::vector<SInternalNode> m_internalNodesPool;
-				const AbstractNode* m_treeRoot = nullptr;
+				SAbstractNode* m_treeRoot = nullptr;
 				std::vector<size_t> m_potentialCollisionsList;
 
-				size_t FindSplit(size_t first, size_t last) const;
-				const AbstractNode* GenerateHierarchyParticles(size_t first, size_t last);
-				const AbstractNode* GenerateHierarchyWing(size_t first, size_t last);
-				void TraverseRecursive(const AbstractNode* subtreeRoot, const CBoundingBox& queryBox, const SLeafNode* self = nullptr);
+				void TraverseRecursive(const SAbstractNode* subtreeRoot, const CBoundingBox& queryBox, const SLeafNode* self = nullptr);
 
-				void BuildTreeForParticleToParticle();
-				void BuildTreeForParticleToWing();
+				int8_t Delta(int64_t i, int64_t j) const;
+				int64_t FindSplit(int64_t i, int64_t j) const;
+				int64_t FindUpperBound(int64_t i, int64_t d, int64_t dMin) const;
+				void ProcessInternalNode(int64_t i);
+				void BuildTree(const glm::vec2* pos, size_t particlesCount);
+
+				void ConstructBoundingBoxes(const glm::vec2* pos, float rad);
+
 				void ResetForces();
 				void ParticleToParticle();
 				void ParticleToWing();

@@ -17,6 +17,12 @@ void CBoundingBox::AddPoint(const glm::vec2& point)
 	m_max = glm::max(m_max, point);
 }
 
+void CBoundingBox::AddBox(const CBoundingBox& other)
+{
+	AddPoint(other.min());
+	AddPoint(other.max());
+}
+
 bool CBoundingBox::IsInside(const glm::vec2& point) const
 {
 	auto outside = false;

@@ -14,6 +14,7 @@ namespace wing2d
 			public:
 				CBoundingBox();
 				void AddPoint(const glm::vec2& point);
+				void AddBox(const CBoundingBox& other);
 				bool IsInside(const glm::vec2& point) const;
 				bool Overlaps(const CBoundingBox& other) const;
 
