@@ -7,7 +7,7 @@ using namespace wing2d::simulation::cpu;
 
 static glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, const glm::vec2& vel2, float springLen)
 {
-	constexpr float stiffness = 20000.0f;
+	constexpr float stiffness = 10000.0f;
 	constexpr float damp = 50.0f;
 	auto v = glm::dot(vel1 - vel2, normal);
 	auto force = normal * (springLen * stiffness + v * damp);
@@ -70,37 +70,38 @@ glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2
 	return force;
 }
 
+#ifdef _WIN64
+#define clz64 __lzcnt64
+#else
 //https://en.wikipedia.org/wiki/Find_first_set#CLZ
 //count leading zeros
 size_t clz64(uint64_t value)
 {
 	return 63 - size_t(glm::floor(glm::log(value) / glm::log(2)));
 }
+#endif
 
 void CDerivativeSolver::ResetForces()
 {
-	std::fill(m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
+	std::fill(std::execution::par_unseq, m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
 }
 
-void CDerivativeSolver::TraverseRecursive(const SAbstractNode* subtreeRoot, const CBoundingBox& queryBox, const SLeafNode* self)
+void CDerivativeSolver::TraverseRecursive(std::vector<size_t>& collisionList, const SAbstractNode* subtreeRoot, const CBoundingBox& queryBox)
 {
 	if (!queryBox.Overlaps(subtreeRoot->box))
 		return;
 
 	if (subtreeRoot->IsLeaf())
 	{
-		if (self == subtreeRoot)
-			return;
-
 		auto leaf = static_cast<const SLeafNode*>(subtreeRoot);
 		auto objectIdx = std::get<1>(leaf->object);
-		m_potentialCollisionsList.push_back(objectIdx);
+		collisionList.push_back(objectIdx);
 	}
 	else
 	{
 		auto internalNode = static_cast<const SInternalNode*>(subtreeRoot);
-		TraverseRecursive(internalNode->left, queryBox, self);
-		TraverseRecursive(internalNode->right, queryBox, self);
+		TraverseRecursive(collisionList, internalNode->left, queryBox);
+		TraverseRecursive(collisionList, internalNode->right, queryBox);
 	}
 }
 
@@ -112,34 +113,38 @@ void CDerivativeSolver::ParticleToParticle()
 	const auto* pos = m_odeState->data();
 	const auto* vel = pos + particles;
 
-	const auto diameter = state.particleRad * 2.0f;
+	const auto rad = state.particleRad;
+	const auto diameter = rad * 2.0f;
 
 	BuildTree(pos, particles);
 
-	for (size_t sortedIdx = 0; sortedIdx < particles; ++sortedIdx)
+	m_potentialCollisionsList.resize(particles);
+
+	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&] (auto& collisionList)
 	{
-		m_potentialCollisionsList.clear();
+		collisionList.clear();
+		size_t i = &collisionList - m_potentialCollisionsList.data();
 
-		auto index = std::get<1>(m_sortedMortonCodes[sortedIdx]);
-		const auto& self = m_leafNodesPool[sortedIdx];
-		TraverseRecursive(m_treeRoot, self.box, &self);
+		const auto &p1 = pos[i];
+		const auto &v1 = vel[i];
+		CBoundingBox box;
+		box.AddPoint(glm::vec2(p1.x - rad, p1.y - rad));
+		box.AddPoint(glm::vec2(p1.x + rad, p1.y + rad));
 
-		if (m_potentialCollisionsList.empty())
-			continue;
+		TraverseRecursive(collisionList, m_treeRoot, box);
 
-		const auto& p1 = pos[index];
-		const auto& v1 = vel[index];
-
-		for (size_t otherObjectIdx : m_potentialCollisionsList)
+		for (size_t otherObjectIdx : collisionList)
 		{
+			if(otherObjectIdx == i)
+				continue;
+
 			const auto& p2 = pos[otherObjectIdx];
 			const auto& v2 = vel[otherObjectIdx];
 
 			auto force = ComputeForce(p1, v1, p2, v2, diameter);
-			m_forces[index] -= force;
-			m_forces[otherObjectIdx] += force;
+			m_forces[i] -= force;
 		}
-	}
+	});
 }
 
 void CDerivativeSolver::ParticleToWing()
@@ -155,9 +160,12 @@ void CDerivativeSolver::ParticleToWing()
 	const auto rad = state.particleRad;
 	const auto diameter = rad * 2.0f;
 
-	for (size_t i = 0; i < particles; ++i)
+	m_potentialCollisionsList.resize(particles);
+
+	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&](auto& collisionList)
 	{
-		m_potentialCollisionsList.clear();
+		collisionList.clear();
+		size_t i = &collisionList - m_potentialCollisionsList.data();
 
 		const auto &p = pos[i];
 		const auto &v = vel[i];
@@ -165,16 +173,14 @@ void CDerivativeSolver::ParticleToWing()
 		box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
 		box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
 
-		TraverseRecursive(m_treeRoot, box);
-		if (m_potentialCollisionsList.empty())
-			continue;
+		TraverseRecursive(collisionList, m_treeRoot, box);
 
-		for (size_t wingIdx : m_potentialCollisionsList)
+		for (size_t wingIdx : collisionList)
 		{
 			const auto& wp = wingParticles[wingIdx];
 			m_forces[i] -= ComputeForce(p, v, wp, glm::vec2(0.0f), diameter);
 		}
-	}
+	});
 }
 
 void CDerivativeSolver::ParticleToWall()
@@ -305,18 +311,13 @@ void CDerivativeSolver::ProcessInternalNode(int64_t i)
 void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 {
 	CBoundingBox particlesBox;
-
 	particlesBox.AddPoints(pos, pos + particlesCount);
+
 	m_sortedMortonCodes.resize(particlesCount);
 	for (size_t i = 0; i < particlesCount; ++i)
 	{
 		const auto& p = pos[i];
 		auto normalized = (p - particlesBox.min()) / particlesBox.size();
-		assert(normalized.x >= 0.0f);
-		assert(normalized.y >= 0.0f);
-		assert(normalized.x <= 1.0f);
-		assert(normalized.y <= 1.0f);
-
 		uint32_t x = uint32_t(glm::round(normalized.x * double(0xFFFFFFFF)));
 		uint32_t y = uint32_t(glm::round(normalized.y * double(0xFFFFFFFF)));
 		uint64_t morton = Morton2D(x, y);
@@ -339,8 +340,13 @@ void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 	for (const auto& obj : m_sortedMortonCodes)
 		m_leafNodesPool.emplace_back(obj);
 
-	for (int64_t i = 0; i < internalCount; ++i)
+	//for (int64_t i = 0; i < internalCount; ++i)
+	//	ProcessInternalNode(i);
+	std::for_each(std::execution::par, m_internalNodesPool.cbegin(), m_internalNodesPool.cend(), [&](const auto& node)
+	{
+		int64_t i = &node - m_internalNodesPool.data();
 		ProcessInternalNode(i);
+	});
 
 	if (particlesCount > 1)
 		m_treeRoot = &m_internalNodesPool[0];

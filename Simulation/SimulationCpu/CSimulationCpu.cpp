@@ -55,29 +55,23 @@ float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 
 void CSimulationCpu::ColorParticles(float dt)
 {
-	auto forces = boost::combine(m_odeState, m_odeNextStatePrecise2) | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
-	auto colors = forces | boost::adaptors::transformed([&](const auto& tuple)
+	std::transform(std::execution::par_unseq, m_odeState.cbegin() + m_state.particles, m_odeState.cend(),
+		m_odeNextStatePrecise2.cbegin() + m_state.particles, m_state.color.begin(), [&](const auto& vel1, const auto& vel2)
 	{
-		glm::vec2 vel1;
-		glm::vec2 vel2;
-		boost::tie(vel1, vel2) = tuple;
 		auto force = (vel2 - vel1) / dt;
 		return getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 10.0f + 0.15f);
 	});
-
-	boost::range::copy_n(colors, m_state.particles, m_state.color.begin());
 }
 
 float CSimulationCpu::Update(float dt)
 {
 	dt = ComputeMinDeltaTime(dt);
 
-	auto pos1 = m_odeState | boost::adaptors::sliced(0, m_state.particles);
-	auto vel1 = m_odeState | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
-	boost::range::copy_n(m_state.pos, m_state.particles, pos1.begin());
-	boost::range::copy_n(m_state.vel, m_state.particles, vel1.begin());
+	auto* pos1 = m_odeState.data();
+	auto* vel1 = pos1 + m_state.particles;
 
-	//m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
+	std::copy_n(std::execution::par_unseq, m_state.pos.data(), m_state.particles, pos1);
+	std::copy_n(std::execution::par_unseq, m_state.vel.data(), m_state.particles, vel1);
 
 	constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
 	constexpr float kDesiredError = 1e-1f;
@@ -96,17 +90,13 @@ float CSimulationCpu::Update(float dt)
 	});
 
 	auto error = glm::sqrt(std::accumulate(squares.begin(), squares.end(), 0.0f));
-	//if (error > kDesiredError)
-	{
-		auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
-		dt *= multiplier;
-		//m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
-	}
+	auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
+	dt *= multiplier;
 
-	auto pos2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(0, m_state.particles);
-	auto vel2 = m_odeNextStatePrecise2 | boost::adaptors::sliced(m_state.particles, m_state.particles * 2);
-	boost::range::copy_n(pos2, m_state.particles, m_state.pos.begin());
-	boost::range::copy_n(vel2, m_state.particles, m_state.vel.begin());
+	auto pos2 = m_odeNextStatePrecise2.data();
+	auto vel2 = pos2 + m_state.particles;
+	std::copy_n(std::execution::par_unseq, pos2, m_state.particles, m_state.pos.begin());
+	std::copy_n(std::execution::par_unseq, vel2, m_state.particles, m_state.vel.begin());
 
 	ColorParticles(dt);
 

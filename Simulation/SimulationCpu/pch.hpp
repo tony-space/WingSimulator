@@ -11,6 +11,7 @@
 #include <numeric>
 #include <functional>
 #include <optional>
+#include <execution>
 
 #include <boost/range.hpp>
 #include <boost/range/adaptors.hpp>

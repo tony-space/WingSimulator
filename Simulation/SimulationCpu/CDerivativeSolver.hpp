@@ -58,9 +58,10 @@ namespace wing2d
 				std::vector<SLeafNode> m_leafNodesPool;
 				std::vector<SInternalNode> m_internalNodesPool;
 				SAbstractNode* m_treeRoot = nullptr;
-				std::vector<size_t> m_potentialCollisionsList;
+				//std::vector<size_t> m_potentialCollisionsList;
+				std::vector<std::vector<size_t>> m_potentialCollisionsList;
 
-				void TraverseRecursive(const SAbstractNode* subtreeRoot, const CBoundingBox& queryBox, const SLeafNode* self = nullptr);
+				void TraverseRecursive(std::vector<size_t>& collisionList, const SAbstractNode* subtreeRoot, const CBoundingBox& queryBox);
 
 				int8_t Delta(int64_t i, int64_t j) const;
 				int64_t FindSplit(int64_t i, int64_t j) const;
