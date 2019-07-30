@@ -94,7 +94,7 @@ void CDerivativeSolver::TraverseRecursive(std::vector<size_t>& collisionList, co
 	if (subtreeRoot->IsLeaf())
 	{
 		auto leaf = static_cast<const SLeafNode*>(subtreeRoot);
-		auto objectIdx = std::get<1>(leaf->object);
+		auto objectIdx = std::get<1>(*leaf->object);
 		collisionList.push_back(objectIdx);
 	}
 	else
@@ -120,7 +120,7 @@ void CDerivativeSolver::ParticleToParticle()
 
 	m_potentialCollisionsList.resize(particles);
 
-	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&] (auto& collisionList)
+	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&](auto& collisionList)
 	{
 		collisionList.clear();
 		size_t i = &collisionList - m_potentialCollisionsList.data();
@@ -135,7 +135,7 @@ void CDerivativeSolver::ParticleToParticle()
 
 		for (size_t otherObjectIdx : collisionList)
 		{
-			if(otherObjectIdx == i)
+			if (otherObjectIdx == i)
 				continue;
 
 			const auto& p2 = pos[otherObjectIdx];
@@ -306,26 +306,30 @@ void CDerivativeSolver::ProcessInternalNode(int64_t i)
 	right->parent = self;
 	self->left = left;
 	self->right = right;
+	self->visited = false;
 }
 
 void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 {
 	CBoundingBox particlesBox;
-	particlesBox.AddPoints(pos, pos + particlesCount);
+	particlesBox.AddPoints(pos, particlesCount);
 
 	m_sortedMortonCodes.resize(particlesCount);
-	for (size_t i = 0; i < particlesCount; ++i)
+	std::transform(std::execution::par_unseq, pos, pos + particlesCount, m_sortedMortonCodes.begin(), [&](const auto& p)
 	{
-		const auto& p = pos[i];
+		auto i = &p - pos;
 		auto normalized = (p - particlesBox.min()) / particlesBox.size();
-		uint32_t x = uint32_t(glm::round(normalized.x * double(0xFFFFFFFF)));
-		uint32_t y = uint32_t(glm::round(normalized.y * double(0xFFFFFFFF)));
+
+		constexpr float kMaxSafeInt = 16777215;// 2 ^ 24 - 1
+
+		uint32_t x = uint32_t(glm::round(normalized.x * kMaxSafeInt));
+		uint32_t y = uint32_t(glm::round(normalized.y * kMaxSafeInt));
 		uint64_t morton = Morton2D(x, y);
 
-		m_sortedMortonCodes[i] = std::make_tuple(morton, i);
-	}
+		return std::make_tuple(morton, i);
+	});
 
-	std::sort(m_sortedMortonCodes.begin(), m_sortedMortonCodes.end(), [](const auto& t1, const auto& t2)
+	std::sort(std::execution::par_unseq, m_sortedMortonCodes.begin(), m_sortedMortonCodes.end(), [](const auto& t1, const auto& t2)
 	{
 		return std::get<0>(t1) < std::get<0>(t2);
 	});
@@ -336,13 +340,15 @@ void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 	m_leafNodesPool.clear();
 
 	m_internalNodesPool.resize(internalCount);
-	m_leafNodesPool.reserve(particlesCount);
-	for (const auto& obj : m_sortedMortonCodes)
-		m_leafNodesPool.emplace_back(obj);
+	m_leafNodesPool.resize(particlesCount);
 
-	//for (int64_t i = 0; i < internalCount; ++i)
-	//	ProcessInternalNode(i);
-	std::for_each(std::execution::par, m_internalNodesPool.cbegin(), m_internalNodesPool.cend(), [&](const auto& node)
+	std::for_each(std::execution::par_unseq, m_leafNodesPool.begin(), m_leafNodesPool.end(), [&](auto& leaf)
+	{
+		auto idx = &leaf - m_leafNodesPool.data();
+		leaf.object = &m_sortedMortonCodes[idx];
+	});
+
+	std::for_each(std::execution::par_unseq, m_internalNodesPool.cbegin(), m_internalNodesPool.cend(), [&](const auto& node)
 	{
 		int64_t i = &node - m_internalNodesPool.data();
 		ProcessInternalNode(i);
@@ -358,37 +364,61 @@ void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 
 void CDerivativeSolver::ConstructBoundingBoxes(const glm::vec2* pos, float rad)
 {
-	int64_t leafs = m_leafNodesPool.size();
+	//int64_t leafs = m_leafNodesPool.size();
 
-	for (int64_t i = 0; i < leafs; ++i)
+	//for (int64_t i = 0; i < leafs; ++i)
+	//{
+	//	auto p = pos[std::get<1>(*m_leafNodesPool[i].object)];
+	//	auto& box = m_leafNodesPool[i].box;
+	//	box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
+	//	box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
+	//}
+
+	//std::function<void(SAbstractNode* subTree)> recursive;
+
+	//recursive = [&](SAbstractNode* subTree)
+	//{
+	//	if (subTree->IsLeaf())
+	//		return;
+
+	//	SInternalNode* self = static_cast<SInternalNode*>(subTree);
+	//	if (self->left)
+	//	{
+	//		recursive(self->left);
+	//		self->box.AddBox(self->left->box);
+	//	}
+	//	if (self->right)
+	//	{
+	//		recursive(self->right);
+	//		self->box.AddBox(self->right->box);
+	//	}
+	//};
+
+	//recursive(m_treeRoot);
+
+	std::for_each(std::execution::par_unseq, m_leafNodesPool.begin(), m_leafNodesPool.end(), [&](auto& leaf)
 	{
-		auto p = pos[std::get<1>(m_leafNodesPool[i].object)];
-		auto& box = m_leafNodesPool[i].box;
-		box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
-		box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
-	}
+		auto p = pos[std::get<1>(*leaf.object)];
+		leaf.box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
+		leaf.box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
 
-	std::function<void(SAbstractNode* subTree)> recursive;
-
-	recursive = [&](SAbstractNode* subTree)
-	{
-		if (subTree->IsLeaf())
-			return;
-
-		SInternalNode* self = static_cast<SInternalNode*>(subTree);
-		if (self->left)
+		SAbstractNode* cur = &leaf;
+		SInternalNode* parent = static_cast<SInternalNode*>(cur->parent);
+		while (parent)
 		{
-			recursive(self->left);
-			self->box.AddBox(self->left->box);
-		}
-		if (self->right)
-		{
-			recursive(self->right);
-			self->box.AddBox(self->right->box);
-		}
-	};
+			auto visited = parent->visited.exchange(true);
+			if (!visited)
+				return;
 
-	recursive(m_treeRoot);
+			if (parent->left)
+				parent->box.AddBox(parent->left->box);
+			if (parent->right)
+				parent->box.AddBox(parent->right->box);
+
+			cur = parent;
+			parent = static_cast<SInternalNode*>(cur->parent);
+		}
+	});
 }
 
 bool CDerivativeSolver::SLeafNode::IsLeaf() const

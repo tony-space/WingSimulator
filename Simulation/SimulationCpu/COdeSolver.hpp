@@ -18,6 +18,7 @@ namespace wing2d
 				typedef std::function<void(const OdeState_t&, OdeState_t&)> DerivativeSolver;
 
 				void RungeKutta(const OdeState_t& state, DerivativeSolver derivateSolver, float dt, OdeState_t& nextState);
+				void Euler(const OdeState_t& state, DerivativeSolver derivateSolver, float dt, OdeState_t& nextState);
 			private:
 				OdeState_t m_derivatives[4];
 				OdeState_t m_tempState;

@@ -73,7 +73,9 @@ float CSimulationCpu::Update(float dt)
 	std::copy_n(std::execution::par_unseq, m_state.pos.data(), m_state.particles, pos1);
 	std::copy_n(std::execution::par_unseq, m_state.vel.data(), m_state.particles, vel1);
 
-	constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
+	m_odeSolver.Euler(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
+
+	/*constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
 	constexpr float kDesiredError = 1e-1f;
 	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStateRude);
 	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise1);
@@ -91,7 +93,7 @@ float CSimulationCpu::Update(float dt)
 
 	auto error = glm::sqrt(std::accumulate(squares.begin(), squares.end(), 0.0f));
 	auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
-	dt *= multiplier;
+	dt *= multiplier;*/
 
 	auto pos2 = m_odeNextStatePrecise2.data();
 	auto vel2 = pos2 + m_state.particles;

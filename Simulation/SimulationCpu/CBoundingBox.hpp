@@ -14,16 +14,11 @@ namespace wing2d
 			public:
 				CBoundingBox();
 				void AddPoint(const glm::vec2& point);
+				void AddPoints(const glm::vec2* points, size_t count);
 				void AddBox(const CBoundingBox& other);
+
 				bool IsInside(const glm::vec2& point) const;
 				bool Overlaps(const CBoundingBox& other) const;
-
-				template <typename T>
-				void AddPoints(T cbegin, T cend)
-				{
-					for (auto it = cbegin; it != cend; ++it)
-						AddPoint(*it);
-				}
 
 				const glm::vec2& min()const { return m_min; }
 				const glm::vec2& max() const { return m_max; }

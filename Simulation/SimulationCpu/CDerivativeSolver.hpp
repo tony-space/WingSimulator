@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <atomic>
 #include <glm/glm.hpp>
 
 #include "CBoundingBox.hpp"
@@ -34,19 +35,20 @@ namespace wing2d
 				};
 				struct SLeafNode : SAbstractNode
 				{
-					const MortonCode_t& object;
-
-					SLeafNode(const MortonCode_t& obj) : object(obj)
-					{
-					}
-
+					const MortonCode_t* object;
 					virtual bool IsLeaf() const override;
 				};
 				struct SInternalNode : SAbstractNode
 				{
 					SAbstractNode* left = nullptr;
 					SAbstractNode* right = nullptr;
+					std::atomic_bool visited = false;
 
+
+					SInternalNode() = default;
+					SInternalNode(const SInternalNode& other)/* : left(other.left), right(other.right), visited((bool)other.visited)*/
+					{
+					};
 					virtual bool IsLeaf() const override;
 				};
 

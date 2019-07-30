@@ -17,6 +17,22 @@ void CBoundingBox::AddPoint(const glm::vec2& point)
 	m_max = glm::max(m_max, point);
 }
 
+void CBoundingBox::AddPoints(const glm::vec2* points, size_t count)
+{
+	auto horizontal = std::minmax_element(std::execution::par_unseq, points, points + count, [](const auto& p1, const auto& p2)
+	{
+		return p1.x < p2.x;
+	});
+
+	auto vertical = std::minmax_element(std::execution::par_unseq, points, points + count, [](const auto& p1, const auto& p2)
+	{
+		return p1.y < p2.y;
+	});
+
+	AddPoint(glm::vec2(horizontal.first->x, vertical.first->y));
+	AddPoint(glm::vec2(horizontal.second->x, vertical.second->y));
+}
+
 void CBoundingBox::AddBox(const CBoundingBox& other)
 {
 	AddPoint(other.min());

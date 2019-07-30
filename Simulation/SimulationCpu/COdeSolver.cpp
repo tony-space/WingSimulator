@@ -96,3 +96,19 @@ void COdeSolver::RungeKutta(const OdeState_t& state, DerivativeSolver derivateSo
 		return state[i] + (m_derivatives[0][i] + 2.0f * (m_derivatives[1][i] + m_derivatives[2][i]) + m_derivatives[3][i]) / 6.0f;
 	});
 }
+
+void COdeSolver::Euler(const OdeState_t & state, DerivativeSolver derivateSolver, float dt, OdeState_t & nextState)
+{
+	if (!derivateSolver)
+		throw std::runtime_error("derivativeSolver is empty");
+
+	const auto stateLen = state.size();
+	m_derivatives[0].resize(stateLen);
+
+	derivateSolver(state, m_derivatives[0]);
+
+	std::transform(std::execution::par_unseq, state.cbegin(), state.cend(), m_derivatives[0].cbegin(), nextState.begin(), [&](const auto& s, const auto& v)
+	{
+		return s + dt * v;
+	});
+}
