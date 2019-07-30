@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <glm/glm.hpp>
 
 namespace wing2d
@@ -25,8 +24,8 @@ namespace wing2d
 				const glm::vec2& center() const;
 				const glm::vec2& size() const;
 			private:
-				std::optional<glm::vec2> m_center;
-				std::optional<glm::vec2> m_size;
+				glm::vec2 m_center;
+				glm::vec2 m_size;
 
 				glm::vec2 m_min;
 				glm::vec2 m_max;

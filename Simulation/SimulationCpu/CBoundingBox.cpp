@@ -15,6 +15,8 @@ void CBoundingBox::AddPoint(const glm::vec2& point)
 {
 	m_min = glm::min(m_min, point);
 	m_max = glm::max(m_max, point);
+	UpdateCenter();
+	UpdateSize();
 }
 
 void CBoundingBox::AddPoints(const glm::vec2* points, size_t count)
@@ -64,16 +66,12 @@ bool CBoundingBox::Overlaps(const CBoundingBox& other) const
 
 const glm::vec2& CBoundingBox::center() const
 {
-	if (!m_center.has_value())
-		const_cast<CBoundingBox*>(this)->UpdateCenter();
-	return m_center.value();
+	return m_center;
 }
 
 const glm::vec2 & CBoundingBox::size() const
 {
-	if (!m_size.has_value())
-		const_cast<CBoundingBox*>(this)->UpdateSize();
-	return m_size.value();
+	return m_size;
 }
 
 void CBoundingBox::UpdateCenter()

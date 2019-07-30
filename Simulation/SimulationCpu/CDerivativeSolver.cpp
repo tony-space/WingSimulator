@@ -3,6 +3,8 @@
 #include "CDerivativeSolver.hpp"
 #include "CSimulationCpu.hpp"
 
+#include "intrin.h"
+
 using namespace wing2d::simulation::cpu;
 
 static glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, const glm::vec2& vel2, float springLen)
@@ -72,6 +74,24 @@ glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2
 
 #ifdef _WIN64
 #define clz64 __lzcnt64
+#elif _WIN32
+size_t clz64(uint64_t value)
+{
+	uint32_t lowDword = static_cast<uint32_t>(value);
+	uint32_t highDword = static_cast<uint32_t>(value >> 32);
+	
+	unsigned long pos;
+	if (_BitScanReverse(&pos, highDword))
+	{
+		return 31 - pos;
+	}
+	else if(_BitScanReverse(&pos, lowDword))
+	{
+		return 63 - pos;
+	}
+
+	return 64;
+}
 #else
 //https://en.wikipedia.org/wiki/Find_first_set#CLZ
 //count leading zeros
@@ -105,6 +125,36 @@ void CDerivativeSolver::TraverseRecursive(std::vector<size_t>& collisionList, co
 	}
 }
 
+void CDerivativeSolver::Traverse(std::vector<size_t>& collisionList, const CBoundingBox & box)
+{
+	constexpr size_t kMaxStackSize = 64;
+	const SAbstractNode* stack[kMaxStackSize];
+	size_t top = 0;
+	stack[top] = m_treeRoot;
+
+	while (top < kMaxStackSize) //top == -1 also covered
+	{
+		const auto* cur = stack[top];
+		--top;
+		if(!cur->box.Overlaps(box))
+			continue;
+
+		if (cur->IsLeaf())
+		{
+			auto leaf = static_cast<const SLeafNode*>(cur);
+			auto objectIdx = std::get<1>(*leaf->object);
+			collisionList.push_back(objectIdx);
+		}
+		else
+		{
+			auto internalNode = static_cast<const SInternalNode*>(cur);
+			stack[++top] = internalNode->left;
+			if(top < kMaxStackSize)
+				stack[++top] = internalNode->right;
+		}
+	}
+}
+
 void CDerivativeSolver::ParticleToParticle()
 {
 	const auto& state = m_simulation.GetState();
@@ -131,7 +181,8 @@ void CDerivativeSolver::ParticleToParticle()
 		box.AddPoint(glm::vec2(p1.x - rad, p1.y - rad));
 		box.AddPoint(glm::vec2(p1.x + rad, p1.y + rad));
 
-		TraverseRecursive(collisionList, m_treeRoot, box);
+		//TraverseRecursive(collisionList, m_treeRoot, box);
+		Traverse(collisionList, box);
 
 		for (size_t otherObjectIdx : collisionList)
 		{
@@ -173,7 +224,8 @@ void CDerivativeSolver::ParticleToWing()
 		box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
 		box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
 
-		TraverseRecursive(collisionList, m_treeRoot, box);
+		//TraverseRecursive(collisionList, m_treeRoot, box);
+		Traverse(collisionList, box);
 
 		for (size_t wingIdx : collisionList)
 		{
