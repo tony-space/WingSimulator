@@ -106,25 +106,6 @@ void CDerivativeSolver::ResetForces()
 	std::fill(std::execution::par_unseq, m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
 }
 
-void CDerivativeSolver::TraverseRecursive(std::vector<size_t>& collisionList, const SAbstractNode* subtreeRoot, const CBoundingBox& queryBox)
-{
-	if (!queryBox.Overlaps(subtreeRoot->box))
-		return;
-
-	if (subtreeRoot->IsLeaf())
-	{
-		auto leaf = static_cast<const SLeafNode*>(subtreeRoot);
-		auto objectIdx = std::get<1>(*leaf->object);
-		collisionList.push_back(objectIdx);
-	}
-	else
-	{
-		auto internalNode = static_cast<const SInternalNode*>(subtreeRoot);
-		TraverseRecursive(collisionList, internalNode->left, queryBox);
-		TraverseRecursive(collisionList, internalNode->right, queryBox);
-	}
-}
-
 void CDerivativeSolver::Traverse(std::vector<size_t>& collisionList, const CBoundingBox & box)
 {
 	constexpr size_t kMaxStackSize = 64;
@@ -181,7 +162,6 @@ void CDerivativeSolver::ParticleToParticle()
 		box.AddPoint(glm::vec2(p1.x - rad, p1.y - rad));
 		box.AddPoint(glm::vec2(p1.x + rad, p1.y + rad));
 
-		//TraverseRecursive(collisionList, m_treeRoot, box);
 		Traverse(collisionList, box);
 
 		for (size_t otherObjectIdx : collisionList)
@@ -224,7 +204,6 @@ void CDerivativeSolver::ParticleToWing()
 		box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
 		box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
 
-		//TraverseRecursive(collisionList, m_treeRoot, box);
 		Traverse(collisionList, box);
 
 		for (size_t wingIdx : collisionList)
@@ -266,15 +245,15 @@ void CDerivativeSolver::ApplyGravity()
 		f.y -= 0.5f;
 }
 
-int8_t CDerivativeSolver::Delta(int64_t i, int64_t j) const
+ptrdiff_t CDerivativeSolver::Delta(size_t i, size_t j) const
 {
-	int64_t n = int64_t(m_sortedMortonCodes.size());
-	if (j < 0 || j > n - 1)
+	auto n = m_sortedMortonCodes.size();
+	if (j > n - 1)
 		return -1;
 
 	auto firstCode = std::get<0>(m_sortedMortonCodes[i]);
 	auto lastCode = std::get<0>(m_sortedMortonCodes[j]);
-	auto bias = int64_t(0);
+	auto bias = ptrdiff_t(0);
 
 	if (firstCode == lastCode)
 	{
@@ -284,16 +263,17 @@ int8_t CDerivativeSolver::Delta(int64_t i, int64_t j) const
 	}
 
 	auto commonPrefix = clz64(firstCode ^ lastCode);
-	return int8_t(bias + commonPrefix);
+	return bias + ptrdiff_t(commonPrefix);
 }
 
-int64_t CDerivativeSolver::FindSplit(int64_t i, int64_t j) const
+size_t CDerivativeSolver::FindSplit(size_t i, size_t j) const
 {
 	auto commonPrefix = Delta(i, j);
-	auto d = glm::sign(j - i);
+	auto delta = ptrdiff_t(j) - ptrdiff_t(i);
+	auto d = glm::sign(delta);
 
-	auto shift = int64_t(0);
-	auto step = d * (j - i); //always positive
+	auto shift = size_t(0);
+	auto step = size_t(d * delta); //always positive
 	do
 	{
 		step = (step + 1) >> 1; // exponential decrease
@@ -302,16 +282,16 @@ int64_t CDerivativeSolver::FindSplit(int64_t i, int64_t j) const
 
 	} while (step > 1);
 
-	return i + shift * d + std::min<int64_t>(d, 0);
+	return i + shift * d + std::min<ptrdiff_t>(d, 0);
 }
 
-int64_t CDerivativeSolver::FindUpperBound(int64_t i, int64_t d, int64_t dMin) const
+size_t CDerivativeSolver::FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const
 {
-	auto lMax = 2;
+	auto lMax = size_t(2);
 	while (Delta(i, i + lMax * d) > dMin)
 		lMax *= 2;
 
-	auto shift = int64_t(0);
+	auto shift = size_t(0);
 	auto step = lMax;
 	do
 	{
@@ -323,7 +303,7 @@ int64_t CDerivativeSolver::FindUpperBound(int64_t i, int64_t d, int64_t dMin) co
 	return i + shift * d;
 }
 
-void CDerivativeSolver::ProcessInternalNode(int64_t i)
+void CDerivativeSolver::ProcessInternalNode(size_t i)
 {
 	auto d = glm::sign(Delta(i, i + 1) - Delta(i, i - 1));
 	auto dMin = Delta(i, i - d);
@@ -386,7 +366,7 @@ void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 		return std::get<0>(t1) < std::get<0>(t2);
 	});
 
-	const int64_t internalCount = particlesCount - 1;
+	const auto internalCount = particlesCount - 1;
 
 	m_internalNodesPool.clear();
 	m_leafNodesPool.clear();
@@ -402,7 +382,7 @@ void CDerivativeSolver::BuildTree(const glm::vec2* pos, size_t particlesCount)
 
 	std::for_each(std::execution::par_unseq, m_internalNodesPool.cbegin(), m_internalNodesPool.cend(), [&](const auto& node)
 	{
-		int64_t i = &node - m_internalNodesPool.data();
+		auto i = &node - m_internalNodesPool.data();
 		ProcessInternalNode(i);
 	});
 
