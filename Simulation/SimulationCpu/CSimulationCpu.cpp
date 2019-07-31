@@ -123,9 +123,9 @@ void CSimulationCpu::BuildWalls()
 
 	m_walls.clear();
 	m_walls.emplace_back(topLeft, topRight);
-	m_walls.emplace_back(topRight, bottomRight);
+	//m_walls.emplace_back(topRight, bottomRight);
 	m_walls.emplace_back(bottomRight, bottomLeft);
-	m_walls.emplace_back(bottomLeft, topLeft);
+	//m_walls.emplace_back(bottomLeft, topLeft);
 }
 
 void CSimulationCpu::BuildWing()
