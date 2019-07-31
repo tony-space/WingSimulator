@@ -4,7 +4,7 @@
 
 using namespace wing2d::simulation::cpu;
 
-CBoundingBox::CBoundingBox():
+CBoundingBox::CBoundingBox() :
 	m_min(INFINITY),
 	m_max(-INFINITY)
 {
@@ -21,24 +21,38 @@ void CBoundingBox::AddPoint(const glm::vec2& point)
 
 void CBoundingBox::AddPoints(const glm::vec2* points, size_t count)
 {
-	auto horizontal = std::minmax_element(std::execution::par_unseq, points, points + count, [](const auto& p1, const auto& p2)
-	{
-		return p1.x < p2.x;
-	});
+	auto result = std::transform_reduce(std::execution::par_unseq,
+		points, points + count, std::make_tuple(INFINITY, INFINITY, -INFINITY, -INFINITY),
+		[](const auto& t1, const auto& t2)
+		{
+			return std::make_tuple(
+				std::min(std::get<0>(t1), std::get<0>(t2)),
+				std::min(std::get<1>(t1), std::get<1>(t2)),
+				std::max(std::get<2>(t1), std::get<2>(t2)),
+				std::max(std::get<3>(t1), std::get<3>(t2))
+			);
+		}, [](const auto& p)
+		{
+			return std::make_tuple(p.x, p.y, p.x, p.y);
+		});
 
-	auto vertical = std::minmax_element(std::execution::par_unseq, points, points + count, [](const auto& p1, const auto& p2)
-	{
-		return p1.y < p2.y;
-	});
+	glm::vec2 minPoint(std::get<0>(result), std::get<1>(result));
+	glm::vec2 maxPoint(std::get<2>(result), std::get<3>(result));
 
-	AddPoint(glm::vec2(horizontal.first->x, vertical.first->y));
-	AddPoint(glm::vec2(horizontal.second->x, vertical.second->y));
+	m_min = glm::min(m_min, minPoint);
+	m_max = glm::max(m_max, maxPoint);
+
+	UpdateCenter();
+	UpdateSize();
 }
 
 void CBoundingBox::AddBox(const CBoundingBox& other)
 {
-	AddPoint(other.min());
-	AddPoint(other.max());
+	m_min = glm::min(m_min, other.min());
+	m_max = glm::max(m_max, other.max());
+
+	UpdateCenter();
+	UpdateSize();
 }
 
 bool CBoundingBox::IsInside(const glm::vec2& point) const

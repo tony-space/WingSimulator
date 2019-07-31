@@ -27,16 +27,18 @@ void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivati
 		throw std::runtime_error("incorrect state/derivative size");
 
 	m_odeState = &state;
-	m_forces.resize(particles);
+	m_combinedForces.resize(particles);
+	m_p2pForces.resize(particles);
+	m_p2wForces.resize(particles);
 
 	ResetForces();
 	ParticleToParticle();
 	ParticleToWing();
 	ParticleToWall();
-	ApplyGravity();
+	CombineForces();
 
 	std::copy(state.cbegin() + particles, state.cend(), derivative.begin());
-	std::copy(m_forces.cbegin(), m_forces.cend(), derivative.begin() + particles);
+	std::copy(m_combinedForces.cbegin(), m_combinedForces.cend(), derivative.begin() + particles);
 }
 
 glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter)
@@ -56,7 +58,9 @@ glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2
 
 void CDerivativeSolver::ResetForces()
 {
-	std::fill(std::execution::par_unseq, m_forces.begin(), m_forces.end(), glm::vec2(0.0f));
+	std::fill(std::execution::par_unseq, m_p2pForces.begin(), m_p2pForces.end(), glm::vec2(0.0f));
+	std::fill(std::execution::par_unseq, m_p2wForces.begin(), m_p2wForces.end(), glm::vec2(0.0f));
+	std::fill(std::execution::par_unseq, m_combinedForces.begin(), m_combinedForces.end(), glm::vec2(0.0f));
 }
 
 void CDerivativeSolver::ParticleToParticle()
@@ -72,12 +76,12 @@ void CDerivativeSolver::ParticleToParticle()
 
 	m_p2pTree.Build(pos, particles, rad);
 
-	m_potentialCollisionsList.resize(particles);
+	m_potentialCollisionsListP2p.resize(particles);
 
-	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&](auto& collisionList)
+	std::for_each(std::execution::par_unseq, m_potentialCollisionsListP2p.begin(), m_potentialCollisionsListP2p.end(), [&](auto& collisionList)
 	{
 		collisionList.clear();
-		size_t i = &collisionList - m_potentialCollisionsList.data();
+		size_t i = &collisionList - m_potentialCollisionsListP2p.data();
 
 		const auto &p1 = pos[i];
 		const auto &v1 = vel[i];
@@ -96,7 +100,7 @@ void CDerivativeSolver::ParticleToParticle()
 			const auto& v2 = vel[otherObjectIdx];
 
 			auto force = ComputeForce(p1, v1, p2, v2, diameter);
-			m_forces[i] -= force;
+			m_p2pForces[i] -= force;
 		}
 	});
 }
@@ -114,12 +118,12 @@ void CDerivativeSolver::ParticleToWing()
 
 	m_p2wTree.Build(wingParticles.data(), wingParticles.size(), rad);
 
-	m_potentialCollisionsList.resize(particles);
+	m_potentialCollisionsListP2w.resize(particles);
 
-	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&](auto& collisionList)
+	std::for_each(std::execution::par_unseq, m_potentialCollisionsListP2w.begin(), m_potentialCollisionsListP2w.end(), [&](auto& collisionList)
 	{
 		collisionList.clear();
-		size_t i = &collisionList - m_potentialCollisionsList.data();
+		size_t i = &collisionList - m_potentialCollisionsListP2w.data();
 
 		const auto &p = pos[i];
 		const auto &v = vel[i];
@@ -132,7 +136,7 @@ void CDerivativeSolver::ParticleToWing()
 		for (size_t wingIdx : collisionList)
 		{
 			const auto& wp = wingParticles[wingIdx];
-			m_forces[i] -= ComputeForce(p, v, wp, glm::vec2(0.0f), diameter);
+			m_p2wForces[i] -= ComputeForce(p, v, wp, glm::vec2(0.0f), diameter);
 		}
 	});
 }
@@ -145,8 +149,10 @@ void CDerivativeSolver::ParticleToWall()
 
 	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
 	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
-	for (size_t i = 0; i < particles; ++i)
+	std::for_each(std::execution::par_unseq, m_combinedForces.begin(), m_combinedForces.end(), [&](auto& force)
 	{
+		size_t i = &force - m_combinedForces.data();
+
 		const auto &p = pos[i];
 		const auto &v = vel[i];
 
@@ -155,15 +161,23 @@ void CDerivativeSolver::ParticleToWall()
 			auto d = w.DistanceToLine(p) - state.particleRad;
 			if (d < 0.0f && glm::dot(w.normal(), p) < 0.0f)
 			{
-				auto force = SpringDamper(w.normal(), v, glm::vec2(0.0f), d);
-				m_forces[i] -= force;
+				auto f = SpringDamper(w.normal(), v, glm::vec2(0.0f), d);
+				force -= f;
 			}
 		}
-	}
+	});
 }
 
-void CDerivativeSolver::ApplyGravity()
+void CDerivativeSolver::CombineForces()
 {
-	for (auto& f : m_forces)
-		f.y -= 0.5f;
+	std::transform(std::execution::par_unseq, m_combinedForces.cbegin(), m_combinedForces.cend(), m_combinedForces.begin(), [&](auto& force)
+	{
+		size_t i = &force - m_combinedForces.data();
+
+		auto f = force + m_p2pForces[i] + m_p2wForces[i];
+		//f.y -= 0.5f;
+		f.x += 0.5f;
+
+		return f;
+	});
 }

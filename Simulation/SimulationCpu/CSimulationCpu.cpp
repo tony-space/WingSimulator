@@ -44,13 +44,16 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 
 float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 {
-	auto timeRange = m_state.vel | boost::adaptors::transformed([&](const auto& v)
+	auto rad = m_state.particleRad;
+	return std::transform_reduce(std::execution::par_unseq, m_state.vel.cbegin(), m_state.vel.cend(), requestedDt, [](const auto t1, const auto t2)
+	{
+		return std::min(t1, t2);
+	}, [&](const auto& v)
 	{
 		auto vel = glm::length(v);
-		auto halfRadDt = m_state.particleRad / vel;
+		auto halfRadDt = rad / vel;
 		return std::min(halfRadDt, requestedDt);
 	});
-	return std::reduce(timeRange.begin(), timeRange.end(), requestedDt, [](auto t1, auto t2) {return t1 < t2 ? t1 : t2; });
 }
 
 void CSimulationCpu::ColorParticles(float dt)
@@ -73,13 +76,13 @@ float CSimulationCpu::Update(float dt)
 	std::copy_n(std::execution::par_unseq, m_state.pos.data(), m_state.particles, pos1);
 	std::copy_n(std::execution::par_unseq, m_state.vel.data(), m_state.particles, vel1);
 
-	m_odeSolver.Euler(m_odeState, m_derivativeSolver, dt, m_odeNextStatePrecise2);
+	m_odeSolver.Euler(m_odeState, std::reference_wrapper(m_derivativeSolver), dt, m_odeNextStatePrecise2);
 
 	/*constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
 	constexpr float kDesiredError = 1e-1f;
-	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt, m_odeNextStateRude);
-	m_odeSolver.RungeKutta(m_odeState, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise1);
-	m_odeSolver.RungeKutta(m_odeNextStatePrecise1, m_derivativeSolver, dt * 0.5f, m_odeNextStatePrecise2);
+	m_odeSolver.RungeKutta(m_odeState, std::reference_wrapper(m_derivativeSolver), dt, m_odeNextStateRude);
+	m_odeSolver.RungeKutta(m_odeState, std::reference_wrapper(m_derivativeSolver), dt * 0.5f, m_odeNextStatePrecise1);
+	m_odeSolver.RungeKutta(m_odeNextStatePrecise1, std::reference_wrapper(m_derivativeSolver), dt * 0.5f, m_odeNextStatePrecise2);
 
 	auto combined = boost::combine(m_odeNextStateRude, m_odeNextStatePrecise2);
 	auto squares = combined | boost::adaptors::transformed([](const auto& tuple)

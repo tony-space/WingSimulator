@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 4096;
+constexpr size_t kParticles = 4096 * 16;
 constexpr float kParticleRad = 0.005f;
 
 //constexpr size_t kParticles = 2048;
@@ -51,6 +51,8 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 		glm::vec2 result;
 		if (fscanf(pFile, "%f %f", &result.x, &result.y) != 2)
 			throw std::runtime_error("Couldn't read the next vertex of airfoil");
+
+		result *= 0.5f;
 		return result;
 	};
 
@@ -79,7 +81,7 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 {
 	wing2d::simulation::SimulationState state;
 	state.particleRad = kParticleRad;
-	state.worldSize.width = (4.0f / 3.0f) * 2.0f;
+	state.worldSize.width = (16.0f / 9.0f) * 2.0f;
 
 	state.particles = kParticles;
 	state.pos.resize(kParticles);
@@ -90,13 +92,13 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 	{
 		//state.pos[i].x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
 		//state.pos[i].y = glm::linearRand(0.25f, 1.0f);
-		state.pos[i].x = glm::linearRand(-0.5f, 0.5f);
-		state.pos[i].y = glm::linearRand(-0.25f, 1.0f);
+		state.pos[i].x = glm::linearRand(state.worldSize.width / -2.0f, -1.25f);
+		state.pos[i].y = glm::linearRand(-1.0f, 1.0f);
 	}
 
 	glm::mat3 modelMat = glm::identity<glm::mat3>();
-	modelMat = glm::translate(modelMat, glm::vec2(-0.5f, -0.5f));
-	//modelMat = glm::rotate(modelMat, -3.1415f / 2.0f);
+	modelMat = glm::translate(modelMat, glm::vec2(-1.2f, 0.0f));
+	modelMat = glm::rotate(modelMat, -10.0f / 180.0f * float(M_PI));
 
 	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [&](const auto& a) -> glm::vec2
 	{
@@ -130,8 +132,8 @@ int main(int argc, char** argv)
 			dt = simulation->Update(dt);
 		});
 
-		//renderer->InitWindowLoop(1920, 1080, true);
-		renderer->InitWindowLoop(800, 600, false);
+		renderer->InitWindowLoop(1920, 1080, true);
+		//renderer->InitWindowLoop(800, 600, false);
 	}
 	catch (const std::exception& ex)
 	{

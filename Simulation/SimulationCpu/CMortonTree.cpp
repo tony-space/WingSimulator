@@ -245,7 +245,7 @@ void CMortonTree::Traverse(std::vector<size_t>& collisionList, const CBoundingBo
 		{
 			auto leaf = static_cast<const SLeafNode*>(cur);
 			auto objectIdx = std::get<1>(*leaf->object);
-			collisionList.push_back(objectIdx);
+			collisionList.emplace_back(objectIdx);
 		}
 		else
 		{
