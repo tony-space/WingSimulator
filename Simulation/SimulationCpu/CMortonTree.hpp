@@ -16,23 +16,32 @@ namespace wing2d
 			class CMortonTree
 			{
 			public:
-				void Build(const glm::vec2* pos, size_t count, float rad);
+				void Build(const std::vector<glm::vec2>& pos, float rad);
 				void Traverse(std::vector<size_t>& collisionList, const CBoundingBox & box) const;
 			private:
 				typedef std::tuple<uint64_t, size_t> MortonCode_t;
 				struct SAbstractNode
 				{
-					CBoundingBox box;
+					enum class NodeType
+					{
+						Leaf,
+						Internal
+					};
 
+					NodeType type;
+					CBoundingBox box;
 					SAbstractNode* parent = nullptr;
 
-					virtual bool IsLeaf() const = 0;
-					virtual ~SAbstractNode() {}
+					SAbstractNode(NodeType _type) : type(_type)
+					{
+
+					}
 				};
 				struct SLeafNode : SAbstractNode
 				{
-					const MortonCode_t* object;
-					virtual bool IsLeaf() const override;
+					size_t id;
+
+					SLeafNode() : SAbstractNode(NodeType::Leaf) {}
 				};
 				struct SInternalNode : SAbstractNode
 				{
@@ -41,14 +50,17 @@ namespace wing2d
 					std::atomic_bool visited = false;
 
 
-					SInternalNode() = default;
-					SInternalNode(const SInternalNode& other)/* : left(other.left), right(other.right), visited((bool)other.visited)*/
+					SInternalNode() : SAbstractNode(NodeType::Internal)
 					{
 					};
-					virtual bool IsLeaf() const override;
+					SInternalNode(const SInternalNode& other) : SAbstractNode(SAbstractNode::NodeType::Internal)
+					{
+					};
 				};
 
-				std::vector<MortonCode_t> m_sortedMortonCodes;
+				std::vector<MortonCode_t> m_sortedTuples;
+				std::vector<uint64_t> m_sortedMortonCodes;
+
 				std::vector<SLeafNode> m_leafNodesPool;
 				std::vector<SInternalNode> m_internalNodesPool;
 				SAbstractNode* m_treeRoot = nullptr;
@@ -57,7 +69,7 @@ namespace wing2d
 				size_t FindSplit(size_t i, size_t j) const;
 				size_t FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const;
 				void ProcessInternalNode(size_t i);
-				void ConstructBoundingBoxes(const glm::vec2* pos, float rad);
+				void ConstructBoundingBoxes(const std::vector<glm::vec2>& pos, float rad);
 			};
 		}
 	}

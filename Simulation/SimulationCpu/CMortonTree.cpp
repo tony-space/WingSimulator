@@ -51,15 +51,16 @@ static inline size_t clz64(uint64_t value)
 }
 #endif
 
-void CMortonTree::Build(const glm::vec2* pos, size_t count, float rad)
+void CMortonTree::Build(const std::vector<glm::vec2>& pos, float rad)
 {
 	CBoundingBox particlesBox;
-	particlesBox.AddPoints(pos, count);
+	particlesBox.AddPoints(pos);
 
-	m_sortedMortonCodes.resize(count);
-	std::transform(std::execution::par_unseq, pos, pos + count, m_sortedMortonCodes.begin(), [&](const auto& p)
+	m_sortedTuples.resize(pos.size());
+	m_sortedMortonCodes.resize(pos.size());
+	std::transform(std::execution::par_unseq, pos.begin(), pos.end(), m_sortedTuples.begin(), [&](const auto& p)
 	{
-		auto i = &p - pos;
+		size_t i = &p - pos.data();
 		auto normalized = (p - particlesBox.min()) / particlesBox.size();
 
 		constexpr float kMaxSafeInt = 16777215;// 2 ^ 24 - 1
@@ -71,32 +72,36 @@ void CMortonTree::Build(const glm::vec2* pos, size_t count, float rad)
 		return std::make_tuple(morton, i);
 	});
 
-	std::sort(std::execution::par_unseq, m_sortedMortonCodes.begin(), m_sortedMortonCodes.end(), [](const auto& t1, const auto& t2)
+	std::sort(std::execution::par_unseq, m_sortedTuples.begin(), m_sortedTuples.end(), [](const auto& t1, const auto& t2)
 	{
 		return std::get<0>(t1) < std::get<0>(t2);
 	});
+	std::transform(std::execution::par_unseq, m_sortedTuples.cbegin(), m_sortedTuples.cend(), m_sortedMortonCodes.begin(), [](const auto& t)
+	{
+		return std::get<0>(t);
+	});
 
-	const auto internalCount = count - 1;
+	const auto internalCount = pos.size() - 1;
 
 	m_internalNodesPool.clear();
 	m_leafNodesPool.clear();
 
 	m_internalNodesPool.resize(internalCount);
-	m_leafNodesPool.resize(count);
+	m_leafNodesPool.resize(pos.size());
 
 	std::for_each(std::execution::par_unseq, m_leafNodesPool.begin(), m_leafNodesPool.end(), [&](auto& leaf)
 	{
-		auto idx = &leaf - m_leafNodesPool.data();
-		leaf.object = &m_sortedMortonCodes[idx];
+		size_t idx = &leaf - m_leafNodesPool.data();
+		leaf.id = idx;
 	});
 
 	std::for_each(std::execution::par_unseq, m_internalNodesPool.cbegin(), m_internalNodesPool.cend(), [&](const auto& node)
 	{
-		auto i = &node - m_internalNodesPool.data();
+		size_t i = &node - m_internalNodesPool.data();
 		ProcessInternalNode(i);
 	});
 
-	if (count > 1)
+	if (pos.size() > 1)
 		m_treeRoot = &m_internalNodesPool[0];
 	else
 		m_treeRoot = &m_leafNodesPool[0];
@@ -110,8 +115,8 @@ ptrdiff_t CMortonTree::Delta(size_t i, size_t j) const
 	if (j > n - 1)
 		return -1;
 
-	auto firstCode = std::get<0>(m_sortedMortonCodes[i]);
-	auto lastCode = std::get<0>(m_sortedMortonCodes[j]);
+	auto firstCode = m_sortedMortonCodes[i];
+	auto lastCode = m_sortedMortonCodes[j];
 	auto bias = ptrdiff_t(0);
 
 	if (firstCode == lastCode)
@@ -200,11 +205,11 @@ void CMortonTree::ProcessInternalNode(size_t i)
 	self->visited = false;
 }
 
-void CMortonTree::ConstructBoundingBoxes(const glm::vec2* pos, float rad)
+void CMortonTree::ConstructBoundingBoxes(const std::vector<glm::vec2>& pos, float rad)
 {
 	std::for_each(std::execution::par_unseq, m_leafNodesPool.begin(), m_leafNodesPool.end(), [&](auto& leaf)
 	{
-		auto p = pos[std::get<1>(*leaf.object)];
+		auto p = pos[std::get<1>(m_sortedTuples[leaf.id])];
 		leaf.box.AddPoint(glm::vec2(p.x + rad, p.y + rad));
 		leaf.box.AddPoint(glm::vec2(p.x - rad, p.y - rad));
 
@@ -241,10 +246,10 @@ void CMortonTree::Traverse(std::vector<size_t>& collisionList, const CBoundingBo
 		if (!cur->box.Overlaps(box))
 			continue;
 
-		if (cur->IsLeaf())
+		if (cur->type == CMortonTree::SAbstractNode::NodeType::Leaf)
 		{
 			auto leaf = static_cast<const SLeafNode*>(cur);
-			auto objectIdx = std::get<1>(*leaf->object);
+			auto objectIdx = std::get<1>(m_sortedTuples[leaf->id]);
 			collisionList.emplace_back(objectIdx);
 		}
 		else
@@ -255,14 +260,4 @@ void CMortonTree::Traverse(std::vector<size_t>& collisionList, const CBoundingBo
 				stack[++top] = internalNode->right;
 		}
 	}
-}
-
-bool CMortonTree::SLeafNode::IsLeaf() const
-{
-	return true;
-}
-
-bool CMortonTree::SInternalNode::IsLeaf() const
-{
-	return false;
 }

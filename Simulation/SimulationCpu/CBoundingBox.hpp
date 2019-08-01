@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <vector>
 
 namespace wing2d
 {
@@ -13,7 +14,7 @@ namespace wing2d
 			public:
 				CBoundingBox();
 				void AddPoint(const glm::vec2& point);
-				void AddPoints(const glm::vec2* points, size_t count);
+				void AddPoints(const std::vector<glm::vec2>& points);
 				void AddBox(const CBoundingBox& other);
 
 				bool IsInside(const glm::vec2& point) const;

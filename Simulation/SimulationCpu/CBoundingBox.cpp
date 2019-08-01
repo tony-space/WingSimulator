@@ -19,10 +19,10 @@ void CBoundingBox::AddPoint(const glm::vec2& point)
 	UpdateSize();
 }
 
-void CBoundingBox::AddPoints(const glm::vec2* points, size_t count)
+void CBoundingBox::AddPoints(const std::vector<glm::vec2>& points)
 {
 	auto result = std::transform_reduce(std::execution::par_unseq,
-		points, points + count, std::make_tuple(INFINITY, INFINITY, -INFINITY, -INFINITY),
+		points.cbegin(), points.cend(), std::make_tuple(INFINITY, INFINITY, -INFINITY, -INFINITY),
 		[](const auto& t1, const auto& t2)
 		{
 			return std::make_tuple(

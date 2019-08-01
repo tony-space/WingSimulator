@@ -134,8 +134,8 @@ int main(int argc, char** argv)
 			dt = simulation->Update(dt);
 		});
 
-		renderer->InitWindowLoop(1920, 1080, true);
-		//renderer->InitWindowLoop(800, 600, false);
+		//renderer->InitWindowLoop(1920, 1080, true);
+		renderer->InitWindowLoop(1280, 720, false);
 	}
 	catch (const std::exception& ex)
 	{
