@@ -4,13 +4,11 @@
 #include <cmath>
 
 #include <vector>
+#include <set>
 #include <deque>
 #include <algorithm>
 #include <iostream>
-
-#include <boost/range.hpp>
-#include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm_ext.hpp>
+#include <iterator>
 
 #define GLM_FORCE_SWIZZLE
 #include <glm/gtc/random.hpp>

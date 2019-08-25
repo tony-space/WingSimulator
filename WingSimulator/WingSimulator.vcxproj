@@ -182,9 +182,6 @@
     <ProjectReference Include="..\Simulation\SimulationCpu\SimulationCpu.vcxproj">
       <Project>{acd33f13-af0c-4be0-99eb-06cf8cdc4e2b}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\third-party\boost\boost-1.70.0\libs\regex\regex.vcxproj">
-      <Project>{464b5361-a7fd-49eb-aa93-6545f554190b}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\third-party\freeglut\freeglut-3.0.0\freeglut.vcxproj">
       <Project>{a9e4dac8-284f-4df3-844c-07c9aaf2a573}</Project>
     </ProjectReference>

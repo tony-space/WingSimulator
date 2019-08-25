@@ -61,19 +61,19 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 	std::generate_n(std::back_inserter(deque), vertices1, vertexParser);
 	std::generate_n(std::front_inserter(deque), vertices2, vertexParser);
 
-	auto range = deque | boost::adaptors::transformed([](const glm::vec2& v) { return std::make_tuple(v.x, v.y); });
+	std::set<std::tuple<float, float>> uniquePoints;
+	std::transform(deque.begin(), deque.end(), std::inserter(uniquePoints, uniquePoints.end()), [](const glm::vec2& v) { return std::make_tuple(v.x, v.y); });
 
-	std::set uniquePoints(range.begin(), range.end());
 	airfoil.reserve(uniquePoints.size());
-	for (const glm::vec2& v : deque)
-	{
-		auto it = uniquePoints.find(std::make_tuple(v.x, v.y));
-		if (it != uniquePoints.end())
+	std::copy_if(deque.cbegin(), deque.cend(), std::back_inserter(airfoil), [&](const glm::vec2& v)
 		{
-			airfoil.emplace_back(v);
-			uniquePoints.erase(it);
-		}
-	}
+			auto it = uniquePoints.find(std::make_tuple(v.x, v.y));
+			auto isUnique = it != uniquePoints.end();
+			if (isUnique)
+				uniquePoints.erase(it);
+			return isUnique;
+		});
+
 	return airfoil;
 }
 
@@ -103,9 +103,9 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 	modelMat = glm::rotate(modelMat, -10.0f / 180.0f * float(M_PI));
 
 	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [&](const auto& a) -> glm::vec2
-	{
-		return (modelMat * glm::vec3(a, 1.0f)).xy;
-	});
+		{
+			return (modelMat * glm::vec3(a, 1.0f)).xy;
+		});
 
 	state.airfoil = std::move(airfoil);
 
@@ -129,10 +129,10 @@ int main(int argc, char** argv)
 		float dt = 0.001f;
 
 		renderer->SetOnUpdate([&]()
-		{
-			renderer->RenderAsync(simulation->GetState());
-			dt = simulation->Update(dt);
-		});
+			{
+				renderer->RenderAsync(simulation->GetState());
+				dt = simulation->Update(dt);
+			});
 
 		//renderer->InitWindowLoop(1920, 1080, true);
 		renderer->InitWindowLoop(1280, 720, false);

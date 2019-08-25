@@ -140,8 +140,8 @@ void CDerivativeSolver::ParticleToWall()
 	const auto& walls = m_simulation.GetWalls();
 	const auto particles = state.particles;
 
-	auto pos = *m_odeState | boost::adaptors::sliced(0, particles);
-	auto vel = *m_odeState | boost::adaptors::sliced(particles, particles * 2);
+	auto pos = m_odeState->begin();
+	auto vel = pos + particles;
 	std::for_each(std::execution::par_unseq, m_forces.begin(), m_forces.end(), [&](auto& force)
 	{
 		size_t i = &force - m_forces.data();

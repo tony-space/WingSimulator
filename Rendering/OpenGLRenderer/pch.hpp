@@ -11,9 +11,6 @@
 #include <GL/wglew.h>
 #include <GL/freeglut.h>
 
-#include <boost/range.hpp>
-#include <boost/range/adaptors.hpp>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
