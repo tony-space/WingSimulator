@@ -3,7 +3,7 @@
 
 using namespace wing2d::simulation::cpu;
 
-CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b)
+CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b) : m_ray()
 {
 	auto delta = b - a;
 	m_length = glm::length(delta);

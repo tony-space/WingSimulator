@@ -236,7 +236,7 @@ void CMortonTree::Traverse(std::vector<size_t>& collisionList, const CBoundingBo
 {
 	constexpr size_t kMaxStackSize = 64;
 	const SAbstractNode* stack[kMaxStackSize];
-	size_t top = 0;
+	unsigned top = 0;
 	stack[top] = m_treeRoot;
 
 	while (top < kMaxStackSize) //top == -1 also covered

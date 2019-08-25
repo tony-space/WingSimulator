@@ -12,7 +12,6 @@ namespace wing2d
 			class CBoundingBox
 			{
 			public:
-				CBoundingBox();
 				void AddPoint(const glm::vec2& point);
 				void AddPoints(const std::vector<glm::vec2>& points);
 				void AddBox(const CBoundingBox& other);
@@ -25,11 +24,11 @@ namespace wing2d
 				const glm::vec2& center() const;
 				const glm::vec2& size() const;
 			private:
-				glm::vec2 m_center;
-				glm::vec2 m_size;
+				glm::vec2 m_center = glm::vec2(NAN);
+				glm::vec2 m_size = glm::vec2(NAN);
 
-				glm::vec2 m_min;
-				glm::vec2 m_max;
+				glm::vec2 m_min = glm::vec2(INFINITY);
+				glm::vec2 m_max = glm::vec2(-INFINITY);
 				void UpdateCenter();
 				void UpdateSize();
 			};

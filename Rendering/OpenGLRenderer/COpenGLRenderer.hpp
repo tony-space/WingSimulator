@@ -20,9 +20,9 @@ namespace wing2d
 
 			private:
 				std::function<void()> m_onUpdate;
-				GLuint m_vao;
-				GLuint m_vboPos;
-				GLuint m_vboColor;
+				GLuint m_vao = -1;
+				GLuint m_vboPos = -1;
+				GLuint m_vboColor = -1;
 				std::unique_ptr<CShaderProgram> m_program;
 
 				//x - width, y - height, z - aspect ratio

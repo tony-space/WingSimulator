@@ -4,13 +4,6 @@
 
 using namespace wing2d::simulation::cpu;
 
-CBoundingBox::CBoundingBox() :
-	m_min(INFINITY),
-	m_max(-INFINITY)
-{
-
-}
-
 void CBoundingBox::AddPoint(const glm::vec2& point)
 {
 	m_min = glm::min(m_min, point);
