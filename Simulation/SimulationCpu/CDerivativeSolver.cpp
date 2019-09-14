@@ -4,6 +4,7 @@
 #include "CSimulationCpu.hpp"
 #include "CBoundingBox.hpp"
 
+using namespace wing2d::simulation;
 using namespace wing2d::simulation::cpu;
 
 static glm::vec2 SpringDamper(const glm::vec2& normal, const glm::vec2& vel1, const glm::vec2& vel2, float springLen)
@@ -20,13 +21,11 @@ CDerivativeSolver::CDerivativeSolver(const CSimulationCpu& sim) :
 {
 }
 
-void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivative)
+void CDerivativeSolver::Derive(const OdeState_t& prevState, const OdeState_t& curState, OdeState_t& outDerivative)
 {
 	const auto particles = m_simulation.GetState().particles;
-	if (state.size() != particles * 2 || derivative.size() != particles * 2)
-		throw std::runtime_error("incorrect state/derivative size");
 
-	m_odeState = &state;
+	m_odeState = &curState;
 	m_forces.resize(particles);
 
 	ResetForces();
@@ -35,8 +34,8 @@ void CDerivativeSolver::operator()(const OdeState_t& state, OdeState_t& derivati
 	ParticleToWall();
 	ApplyGravity();
 
-	std::copy(std::execution::par_unseq, state.cbegin() + particles, state.cend(), derivative.begin());
-	std::copy(std::execution::par_unseq, m_forces.cbegin(), m_forces.cend(), derivative.begin() + particles);
+	std::copy(std::execution::par_unseq, curState.cbegin() + particles, curState.cend(), outDerivative.begin());
+	std::copy(std::execution::par_unseq, m_forces.cbegin(), m_forces.cend(), outDerivative.begin() + particles);
 }
 
 glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter)

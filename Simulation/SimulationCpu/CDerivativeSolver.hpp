@@ -5,6 +5,8 @@
 #include <atomic>
 #include <glm/glm.hpp>
 
+#include "../Simulation.hpp"
+
 #include "CMortonTree.hpp"
 
 namespace wing2d
@@ -15,13 +17,12 @@ namespace wing2d
 		{
 			class CSimulationCpu;
 
-			class CDerivativeSolver
+			class CDerivativeSolver : public IDerivativeSolver
 			{
 			public:
-				typedef std::vector<glm::vec2> OdeState_t;
-
 				CDerivativeSolver(const CSimulationCpu& sim);
-				void operator() (const OdeState_t& odeState, OdeState_t& odeDerivative);
+
+				virtual void Derive(const OdeState_t& prevState, const OdeState_t& curState, OdeState_t& outDerivative) override;
 			private:
 				const CSimulationCpu& m_simulation;
 				const OdeState_t* m_odeState = nullptr;

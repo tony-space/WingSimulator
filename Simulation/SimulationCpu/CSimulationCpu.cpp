@@ -22,11 +22,6 @@ std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
 	return std::make_unique<CSimulationCpu>();
 }
 
-CSimulationCpu::CSimulationCpu() : m_derivativeSolver(*this)
-{
-
-}
-
 void CSimulationCpu::ResetState(const SimulationState& state)
 {
 	if (!state.IsValid())
@@ -76,7 +71,7 @@ float CSimulationCpu::Update(float dt)
 	std::copy_n(std::execution::par_unseq, m_state.pos.data(), m_state.particles, pos1);
 	std::copy_n(std::execution::par_unseq, m_state.vel.data(), m_state.particles, vel1);
 
-	m_odeSolver.Euler(m_odeState, std::reference_wrapper(m_derivativeSolver), dt, m_odeNextStatePrecise2);
+	m_odeSolver->NextState(m_odeState, m_odeState, dt, m_odeNextStatePrecise2);
 
 	/*constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
 	constexpr float kDesiredError = 1e-1f;
