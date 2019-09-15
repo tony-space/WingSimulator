@@ -4,7 +4,6 @@
 #include <vector>
 #include <tuple>
 
-#include <glm/vec2.hpp>
 #include "CBoundingBox.hpp"
 
 namespace wing2d
@@ -16,8 +15,8 @@ namespace wing2d
 			class CMortonTree
 			{
 			public:
-				void Build(const std::vector<glm::vec2>& pos, float rad);
-				void Traverse(std::vector<size_t>& collisionList, const CBoundingBox & box) const;
+				void Build(const std::vector<CBoundingBox>& leafs);
+				void Traverse(const CBoundingBox& box, std::vector<size_t>& outCollisionList) const;
 			private:
 				typedef std::tuple<uint64_t, size_t> MortonCode_t;
 				struct SAbstractNode
@@ -69,7 +68,7 @@ namespace wing2d
 				size_t FindSplit(size_t i, size_t j) const;
 				size_t FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const;
 				void ProcessInternalNode(size_t i);
-				void ConstructBoundingBoxes(const std::vector<glm::vec2>& pos, float rad);
+				void ConstructBoundingBoxes(const std::vector<CBoundingBox>& leafs);
 			};
 		}
 	}

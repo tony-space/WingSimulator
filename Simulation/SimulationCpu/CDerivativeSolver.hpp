@@ -28,7 +28,8 @@ namespace wing2d
 				const OdeState_t* m_odeState = nullptr;
 
 				CMortonTree m_particlesTree;
-				std::vector<glm::vec2> m_allParticles;
+				std::vector<CBoundingBox> m_allObjects;
+
 				std::vector<glm::vec2> m_forces;
 				std::vector<std::vector<size_t>> m_potentialCollisionsList;
 

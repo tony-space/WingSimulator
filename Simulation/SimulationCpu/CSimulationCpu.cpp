@@ -132,7 +132,7 @@ void CSimulationCpu::BuildWing()
 
 	for (auto& t : pairs)
 	{
-		auto[first, second] = t;
+		auto [first, second] = t;
 		auto dir = second - first;
 		auto len = glm::length(dir);
 		dir /= len;

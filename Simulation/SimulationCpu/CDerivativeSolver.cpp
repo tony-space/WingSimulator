@@ -62,24 +62,26 @@ void CDerivativeSolver::BuildTree()
 {
 	const auto& state = m_simulation.GetState();
 	const auto gasParticles = state.particles;
-	
+
 	const auto& wing = m_simulation.GetWing();
 	const auto wingParticles = wing.size();
-	
+
 	const auto rad = state.particleRad;
 
-	m_allParticles.resize(gasParticles + wingParticles);
+	m_allObjects.resize(gasParticles + wingParticles);
 	const auto* pos = m_odeState->data();
-	std::for_each(std::execution::par_unseq, m_allParticles.begin(), m_allParticles.end(), [&](auto& vecPtr)
+	std::for_each(std::execution::par_unseq, m_allObjects.begin(), m_allObjects.end(), [&](CBoundingBox& objBox)
 	{
-		size_t i = &vecPtr - m_allParticles.data();
-		if (i < gasParticles)
-			vecPtr = pos[i];
-		else
-			vecPtr = wing[i - gasParticles];
+		size_t i = &objBox - m_allObjects.data();
+		auto min = -glm::vec2(rad, rad);
+		auto max = glm::vec2(rad, rad);
+		auto p = i < gasParticles ? pos[i] : wing[i - gasParticles];
+
+		objBox.SetMin(min + p);
+		objBox.SetMax(max + p);
 	});
 
-	m_particlesTree.Build(m_allParticles, rad);
+	m_particlesTree.Build(m_allObjects);
 }
 
 void CDerivativeSolver::ResolveCollisions()
@@ -90,23 +92,21 @@ void CDerivativeSolver::ResolveCollisions()
 
 	const auto* pos = m_odeState->data();
 	const auto* vel = pos + gasParticles;
-	const auto rad = state.particleRad;
-	const auto diameter = rad * 2.0f;
-	
+	const auto diameter = state.particleRad * 2.0f;
+
+	const auto corner = glm::vec2(state.particleRad, state.particleRad);
+
 	m_potentialCollisionsList.resize(gasParticles);
 
 	std::for_each(std::execution::par_unseq, m_potentialCollisionsList.begin(), m_potentialCollisionsList.end(), [&](auto& collisionList)
 	{
-		collisionList.clear();
 		size_t i = &collisionList - m_potentialCollisionsList.data();
 
-		const auto &p1 = pos[i];
-		const auto &v1 = vel[i];
-		CBoundingBox box;
-		box.AddPoint(glm::vec2(p1.x - rad, p1.y - rad));
-		box.AddPoint(glm::vec2(p1.x + rad, p1.y + rad));
+		const auto& p1 = pos[i];
+		const auto& v1 = vel[i];
+		CBoundingBox box(p1 - corner, p1 + corner);
 
-		m_particlesTree.Traverse(collisionList, box);
+		m_particlesTree.Traverse(box, collisionList);
 
 		glm::vec2 force(0.0f);
 
@@ -145,8 +145,8 @@ void CDerivativeSolver::ParticleToWall()
 	{
 		size_t i = &force - m_forces.data();
 
-		const auto &p = pos[i];
-		const auto &v = vel[i];
+		const auto& p = pos[i];
+		const auto& v = vel[i];
 
 		for (const auto& w : walls)
 		{
