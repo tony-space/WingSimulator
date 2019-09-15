@@ -22,22 +22,24 @@ namespace wing2d
 				const std::vector<CLineSegment>& GetWalls() const { return m_walls; };
 				const std::vector<glm::vec2>& GetWing() const { return m_wingParticles; }
 			private:
-				wing2d::simulation::SimulationState m_state;
+				mutable wing2d::simulation::SimulationState m_state;
 
 				std::unique_ptr<IOdeSolver> m_odeSolver = {std::make_unique<CForwardEulerSolver>(std::make_unique<CDerivativeSolver>(*this))};
 
 				std::vector<CLineSegment> m_walls;
 				std::vector<glm::vec2> m_wingParticles;
-				std::vector<glm::vec2> m_odeState;
-				std::vector<glm::vec2> m_odeNextStateRude;
-				std::vector<glm::vec2> m_odeNextStatePrecise1;
-				std::vector<glm::vec2> m_odeNextStatePrecise2;
+				
+				OdeState_t m_prevOdeState;
+				OdeState_t m_curOdeState;
+				OdeState_t m_nextOdeState;
+
+				float m_dt = 0.0f;
+
 
 				void BuildWalls();
 				void BuildWing();
 
 				float ComputeMinDeltaTime(float requestedDt) const;
-				void ColorParticles(float dt);
 			};
 		}
 	}

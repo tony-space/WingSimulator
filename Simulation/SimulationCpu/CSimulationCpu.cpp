@@ -31,16 +31,27 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 	BuildWalls();
 	BuildWing();
 
-	m_odeState.resize(m_state.particles * 2);
-	m_odeNextStateRude.resize(m_state.particles * 2);
-	m_odeNextStatePrecise1.resize(m_state.particles * 2);
-	m_odeNextStatePrecise2.resize(m_state.particles * 2);
+	auto size = m_state.particles * 2;
+
+	m_prevOdeState.resize(size);
+	m_curOdeState.resize(size);
+	m_nextOdeState.resize(size);
+
+	auto pos = m_curOdeState.begin();
+	auto vel = pos + m_state.particles;
+
+	std::copy(std::execution::par_unseq, m_state.pos.cbegin(), m_state.pos.cend(), pos);
+	std::copy(std::execution::par_unseq, m_state.vel.cbegin(), m_state.vel.cend(), vel);
+	std::copy(std::execution::par_unseq, m_curOdeState.cbegin(), m_curOdeState.cend(), m_prevOdeState.begin());
 }
 
 float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 {
 	auto rad = m_state.particleRad;
-	return std::transform_reduce(std::execution::par_unseq, m_state.vel.cbegin(), m_state.vel.cend(), requestedDt, [](const auto t1, const auto t2)
+	auto velBegin = m_curOdeState.cbegin() + m_state.particles;
+	auto velEnd = m_curOdeState.cend();
+
+	return std::transform_reduce(std::execution::par_unseq, velBegin, velEnd, requestedDt, [](const auto t1, const auto t2)
 	{
 		return std::min(t1, t2);
 	}, [&](const auto& v)
@@ -51,60 +62,40 @@ float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 	});
 }
 
-void CSimulationCpu::ColorParticles(float dt)
-{
-	std::transform(std::execution::par_unseq, m_odeState.cbegin() + m_state.particles, m_odeState.cend(),
-		m_odeNextStatePrecise2.cbegin() + m_state.particles, m_state.color.begin(), [&](const auto& vel1, const auto& vel2)
-	{
-		auto force = (vel2 - vel1) / dt;
-		return getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 10.0f + 0.15f);
-	});
-}
-
 float CSimulationCpu::Update(float dt)
 {
 	dt = ComputeMinDeltaTime(dt);
 
-	auto* pos1 = m_odeState.data();
-	auto* vel1 = pos1 + m_state.particles;
+	m_odeSolver->NextState(m_prevOdeState, m_curOdeState, dt, m_nextOdeState);
 
-	std::copy_n(std::execution::par_unseq, m_state.pos.data(), m_state.particles, pos1);
-	std::copy_n(std::execution::par_unseq, m_state.vel.data(), m_state.particles, vel1);
-
-	m_odeSolver->NextState(m_odeState, m_odeState, dt, m_odeNextStatePrecise2);
-
-	/*constexpr float kOrderOfRkErrorInv = 1.0f / 5.0f;
-	constexpr float kDesiredError = 1e-1f;
-	m_odeSolver.RungeKutta(m_odeState, std::reference_wrapper(m_derivativeSolver), dt, m_odeNextStateRude);
-	m_odeSolver.RungeKutta(m_odeState, std::reference_wrapper(m_derivativeSolver), dt * 0.5f, m_odeNextStatePrecise1);
-	m_odeSolver.RungeKutta(m_odeNextStatePrecise1, std::reference_wrapper(m_derivativeSolver), dt * 0.5f, m_odeNextStatePrecise2);
-
-	auto combined = boost::combine(m_odeNextStateRude, m_odeNextStatePrecise2);
-	auto squares = combined | boost::adaptors::transformed([](const auto& tuple)
-	{
-		glm::vec2 a;
-		glm::vec2 b;
-		boost::tie(a, b) = tuple;
-		glm::vec2 delta = b - a;
-		return glm::dot(delta, delta);
-	});
-
-	auto error = glm::sqrt(std::accumulate(squares.begin(), squares.end(), 0.0f));
-	auto multiplier = glm::pow(kDesiredError / error, kOrderOfRkErrorInv);
-	dt *= multiplier;*/
-
-	auto pos2 = m_odeNextStatePrecise2.data();
-	auto vel2 = pos2 + m_state.particles;
-	std::copy_n(std::execution::par_unseq, pos2, m_state.particles, m_state.pos.begin());
-	std::copy_n(std::execution::par_unseq, vel2, m_state.particles, m_state.vel.begin());
-
-	ColorParticles(dt);
+	m_curOdeState.swap(m_prevOdeState);
+	m_nextOdeState.swap(m_curOdeState);
+	
+	m_dt = dt;
 
 	return dt;
 }
 
 const SimulationState& CSimulationCpu::GetState() const
 {
+	auto pos = m_curOdeState.cbegin();
+	auto vel = pos + m_state.particles;
+	auto end = m_curOdeState.cend();
+
+	std::copy(std::execution::par_unseq, pos, vel, m_state.pos.begin());
+	std::copy(std::execution::par_unseq, vel, end, m_state.vel.begin());
+
+	auto prevVelBegin = m_prevOdeState.cbegin() + m_state.particles;
+	auto prevVelEnd = m_prevOdeState.cend();
+
+	auto curVelBegin = m_curOdeState.cbegin() + m_state.particles;
+
+	std::transform(std::execution::par_unseq, prevVelBegin, prevVelEnd, curVelBegin, m_state.color.begin(), [&](const auto& vel1, const auto& vel2)
+	{
+		auto force = (vel2 - vel1) / m_dt;
+		return getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 10.0f + 0.15f);
+	}); 
+
 	return m_state;
 }
 
