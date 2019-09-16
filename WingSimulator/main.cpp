@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
 constexpr size_t kParticles = 4096 * 32;
-constexpr float kParticleRad = 0.005f;
+constexpr float kParticleRad = 0.006f;
 
 //constexpr size_t kParticles = 2048;
 //constexpr float kParticleRad = 0.01f;

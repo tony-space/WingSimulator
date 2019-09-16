@@ -10,9 +10,12 @@
 
 #include <algorithm>
 #include <numeric>
-#include <functional>
 #include <execution>
 
+#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
+#include <glm/matrix.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_transform_2d.hpp>
 
 #include "../Simulation.hpp"

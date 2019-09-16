@@ -31,7 +31,7 @@ namespace wing2d
 				CForwardEulerSolver(const CForwardEulerSolver&) = delete;
 				CForwardEulerSolver(CForwardEulerSolver&&) = delete;
 
-				virtual void NextState(const OdeState_t& prevState, const OdeState_t& curState, const float dt, OdeState_t& outNextState) override;
+				virtual void NextState(const OdeState_t& curState, const float dt, OdeState_t& outNextState) override;
 			private:
 				std::unique_ptr<IDerivativeSolver> m_derivativeSolver = nullptr;
 				OdeState_t m_derivative;

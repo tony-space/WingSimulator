@@ -16,6 +16,7 @@ namespace wing2d
 				CBoundingBox(const glm::vec2& p1, const glm::vec2& p2);
 				CBoundingBox(const CBoundingBox&) = default;
 				CBoundingBox(CBoundingBox&&) = default;
+				CBoundingBox& operator=(const CBoundingBox&) = default;
 
 
 				void AddPoint(const glm::vec2& point);

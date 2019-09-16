@@ -44,13 +44,13 @@ namespace wing2d
 
 		struct IDerivativeSolver
 		{
-			virtual void Derive(const OdeState_t& prevState, const OdeState_t& curState, OdeState_t& outDerivative) = 0;
+			virtual void Derive(const OdeState_t& curState, OdeState_t& outDerivative) = 0;
 			virtual ~IDerivativeSolver() = default;
 		};
 
 		struct IOdeSolver
 		{
-			virtual void NextState(const OdeState_t& prevState, const OdeState_t& curState, const float dt, OdeState_t& outNextState) = 0;
+			virtual void NextState(const OdeState_t& curState, const float dt, OdeState_t& outNextState) = 0;
 			virtual ~IOdeSolver() = default;
 		};
 

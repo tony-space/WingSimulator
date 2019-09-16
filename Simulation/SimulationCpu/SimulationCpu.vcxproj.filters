@@ -5,7 +5,6 @@
     <ClInclude Include="pch.hpp" />
     <ClInclude Include="CBoundingBox.hpp" />
     <ClInclude Include="CLineSegment.hpp" />
-    <ClInclude Include="collisions.hpp" />
     <ClInclude Include="CDerivativeSolver.hpp" />
     <ClInclude Include="CMortonTree.hpp" />
     <ClInclude Include="OdeSolvers.hpp" />
@@ -15,7 +14,6 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="CBoundingBox.cpp" />
     <ClCompile Include="CLineSegment.cpp" />
-    <ClCompile Include="collisions.cpp" />
     <ClCompile Include="CDerivativeSolver.cpp" />
     <ClCompile Include="CMortonTree.cpp" />
     <ClCompile Include="OdeSolvers.cpp" />

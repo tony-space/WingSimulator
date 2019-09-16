@@ -15,8 +15,28 @@ CLineSegment::CLineSegment(const glm::vec2& a, const glm::vec2& b) : m_ray()
 	else
 		m_length = 0.0f;
 
-	m_normal = glm::vec2(m_ray.y, -m_ray.x);
+	m_normal = glm::vec2(-m_ray.y, m_ray.x);
 	m_distance = glm::dot(a, m_normal);
+}
+
+const glm::vec2& wing2d::simulation::cpu::CLineSegment::First() const
+{
+	return m_first;
+}
+
+const glm::vec2& wing2d::simulation::cpu::CLineSegment::Second() const
+{
+	return m_second;
+}
+
+const glm::vec2& wing2d::simulation::cpu::CLineSegment::Ray() const
+{
+	return m_ray;
+}
+
+const glm::vec2& CLineSegment::Normal() const
+{
+	return m_normal; 
 }
 
 float CLineSegment::DistanceToLine(const glm::vec2& pos) const
@@ -28,28 +48,21 @@ float CLineSegment::DistanceToLine(const glm::vec2& pos) const
 	return isAbove * glm::sqrt(glm::dot(dirToCenter, dirToCenter) - centerProj * centerProj);
 }
 
-bool wing2d::simulation::cpu::CLineSegment::PredictCollision(const glm::vec2& pos, const glm::vec2& vel, float rad, collisions::SCollisionForecast& out) const
+glm::vec2 CLineSegment::ClosestPoint(const glm::vec2& pos) const
 {
-	out.timeToCollision = INFINITY;
+	const auto toPos = pos - m_first;
+	const auto projection = glm::dot(m_ray, toPos);
 
-	collisions::SCollisionForecast temp;
-
-	if (TimeToLine(pos, vel, rad, m_normal, m_distance, temp))
+	if (projection < 0.0f)
 	{
-		//intersection might happen to infinite line, but not necessarily to the finite line segment 
-		auto contact = glm::dot(temp.contactPoint - m_first, m_ray);
-		if (contact >= 0.0f && contact <= m_length) //if contact point is between start and pos;
-		{
-			if(temp.timeToCollision > 0.0f)
-				out = temp;
-		}
+		return m_first;
 	}
-
-	if (TimeToPoint(pos, vel, rad, m_first, temp) && temp.timeToCollision < out.timeToCollision)
-		out = temp;
-
-	if (TimeToPoint(pos, vel, rad, m_second, temp) && temp.timeToCollision < out.timeToCollision)
-		out = temp;
-
-	return out.timeToCollision != INFINITY;
+	else if (projection >= 0.0f && projection <= m_length)
+	{
+		return m_first + m_ray * projection;
+	}
+	else
+	{
+		return m_second;
+	}
 }

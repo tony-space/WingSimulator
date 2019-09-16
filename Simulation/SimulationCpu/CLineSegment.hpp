@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 
-#include "collisions.hpp"
+#include <optional>
 
 namespace wing2d
 {
@@ -14,10 +14,19 @@ namespace wing2d
 			public:
 				CLineSegment(const glm::vec2& first, const glm::vec2& second);
 
-				float DistanceToLine(const glm::vec2& pos) const;
-				bool PredictCollision(const glm::vec2& pos, const glm::vec2& vel, float rad, collisions::SCollisionForecast& out) const;
+				CLineSegment() = delete;
 
-				const auto& normal() const { return m_normal; }
+				CLineSegment(const CLineSegment&) = default;
+				CLineSegment(CLineSegment&&) = default;
+				CLineSegment& operator= (const CLineSegment&) = default;
+
+				const glm::vec2& First() const;
+				const glm::vec2& Second() const;
+				const glm::vec2& Ray() const;
+				const glm::vec2& Normal() const;
+
+				float DistanceToLine(const glm::vec2& pos) const;
+				glm::vec2 ClosestPoint(const glm::vec2& pos) const;
 			private:
 				glm::vec2 m_first;
 				glm::vec2 m_second;

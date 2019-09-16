@@ -33,7 +33,6 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 
 	auto size = m_state.particles * 2;
 
-	m_prevOdeState.resize(size);
 	m_curOdeState.resize(size);
 	m_nextOdeState.resize(size);
 
@@ -42,7 +41,8 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 
 	std::copy(std::execution::par_unseq, m_state.pos.cbegin(), m_state.pos.cend(), pos);
 	std::copy(std::execution::par_unseq, m_state.vel.cbegin(), m_state.vel.cend(), vel);
-	std::copy(std::execution::par_unseq, m_curOdeState.cbegin(), m_curOdeState.cend(), m_prevOdeState.begin());
+
+	m_odeSolver = std::make_unique<CForwardEulerSolver>(std::make_unique<CDerivativeSolver>(*this));
 }
 
 float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
@@ -66,14 +66,25 @@ float CSimulationCpu::Update(float dt)
 {
 	dt = ComputeMinDeltaTime(dt);
 
-	m_odeSolver->NextState(m_prevOdeState, m_curOdeState, dt, m_nextOdeState);
+	m_odeSolver->NextState(m_curOdeState, dt, m_nextOdeState);
 
-	m_curOdeState.swap(m_prevOdeState);
+	ColorParticles(dt);
+
 	m_nextOdeState.swap(m_curOdeState);
-	
-	m_dt = dt;
 
 	return dt;
+}
+
+void CSimulationCpu::ColorParticles(float dt)
+{
+	auto curVelBegin = m_curOdeState.cbegin() + m_state.particles;
+	auto curVelEnd = curVelBegin + m_state.particles;
+	auto nextVelBegin = m_nextOdeState.cbegin() + m_state.particles;
+	std::transform(std::execution::par_unseq, curVelBegin, curVelEnd, nextVelBegin, m_state.color.begin(), [&](const auto& vel1, const auto& vel2)
+	{
+		auto force = (vel2 - vel1) / dt;
+		return getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 10.0f + 0.15f);
+	});
 }
 
 const SimulationState& CSimulationCpu::GetState() const
@@ -85,18 +96,27 @@ const SimulationState& CSimulationCpu::GetState() const
 	std::copy(std::execution::par_unseq, pos, vel, m_state.pos.begin());
 	std::copy(std::execution::par_unseq, vel, end, m_state.vel.begin());
 
-	auto prevVelBegin = m_prevOdeState.cbegin() + m_state.particles;
-	auto prevVelEnd = m_prevOdeState.cend();
-
-	auto curVelBegin = m_curOdeState.cbegin() + m_state.particles;
-
-	std::transform(std::execution::par_unseq, prevVelBegin, prevVelEnd, curVelBegin, m_state.color.begin(), [&](const auto& vel1, const auto& vel2)
-	{
-		auto force = (vel2 - vel1) / m_dt;
-		return getHeatMapColor(glm::log(glm::length(force) + 1.0f) / 10.0f + 0.15f);
-	}); 
-
 	return m_state;
+}
+
+size_t CSimulationCpu::GetParticlesCount() const
+{
+	return m_state.particles;
+}
+
+float CSimulationCpu::GetParticleRadius() const
+{
+	return m_state.particleRad;
+}
+
+const std::vector<CLineSegment>& CSimulationCpu::GetWalls() const
+{
+	return m_walls;
+}
+
+const std::vector<CLineSegment>& CSimulationCpu::GetWing() const
+{
+	return m_wing;
 }
 
 void CSimulationCpu::BuildWalls()
@@ -108,32 +128,15 @@ void CSimulationCpu::BuildWalls()
 	glm::vec2 bottomLeft(-corner.x, -corner.y);
 
 	m_walls.clear();
-	m_walls.emplace_back(topLeft, topRight);
-	//m_walls.emplace_back(topRight, bottomRight);
-	m_walls.emplace_back(bottomRight, bottomLeft);
-	//m_walls.emplace_back(bottomLeft, topLeft);
+	m_walls.emplace_back(topRight, topLeft);
+	//m_walls.emplace_back(topLeft, bottomLeft);
+	m_walls.emplace_back(bottomLeft, bottomRight);
+	//m_walls.emplace_back(bottomRight, topRight);
 }
 
 void CSimulationCpu::BuildWing()
 {
-	std::vector<std::tuple<glm::vec2, glm::vec2>> pairs;
 	for (size_t i = 0; i < m_state.airfoil.size() - 1; ++i)
-		pairs.emplace_back(std::make_tuple(m_state.airfoil[i], m_state.airfoil[i + 1]));
-	pairs.emplace_back(std::make_tuple(m_state.airfoil.back(), m_state.airfoil.front()));
-
-	for (auto& t : pairs)
-	{
-		auto [first, second] = t;
-		auto dir = second - first;
-		auto len = glm::length(dir);
-		dir /= len;
-
-		size_t particles = size_t(glm::ceil(len / (m_state.particleRad)));
-
-		for (size_t i = 0; i < particles; ++i)
-		{
-			auto nextPos = m_state.particleRad + i * (m_state.particleRad);
-			m_wingParticles.emplace_back(first + dir * nextPos);
-		}
-	}
+		m_wing.emplace_back(m_state.airfoil[i], m_state.airfoil[i + 1]);
+	m_wing.emplace_back(m_state.airfoil.back(), m_state.airfoil.front());
 }

@@ -181,7 +181,6 @@
     <ClInclude Include="CDerivativeSolver.hpp" />
     <ClInclude Include="CLineSegment.hpp" />
     <ClInclude Include="CMortonTree.hpp" />
-    <ClInclude Include="collisions.hpp" />
     <ClInclude Include="CSimulationCpu.hpp" />
     <ClInclude Include="OdeSolvers.hpp" />
     <ClInclude Include="pch.hpp" />
@@ -191,7 +190,6 @@
     <ClCompile Include="CDerivativeSolver.cpp" />
     <ClCompile Include="CLineSegment.cpp" />
     <ClCompile Include="CMortonTree.cpp" />
-    <ClCompile Include="collisions.cpp" />
     <ClCompile Include="CSimulationCpu.cpp" />
     <ClCompile Include="OdeSolvers.cpp" />
     <ClCompile Include="pch.cpp">
