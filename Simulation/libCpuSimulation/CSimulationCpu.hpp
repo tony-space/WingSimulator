@@ -2,6 +2,7 @@
 #include "../Simulation.hpp"
 
 #include "CLineSegment.hpp"
+#include "CpuInterfaces.h"
 #include "CDerivativeSolver.hpp"
 #include "OdeSolvers.hpp"
 

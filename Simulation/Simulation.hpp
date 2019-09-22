@@ -17,8 +17,6 @@ namespace wing2d
 {
 	namespace simulation
 	{
-		typedef std::vector<glm::vec2> OdeState_t;
-
 		struct SimulationState
 		{
 			struct
@@ -47,18 +45,6 @@ namespace wing2d
 			virtual float Update(float dt) = 0;
 			virtual const SimulationState& GetState() const = 0;
 			virtual ~ISimulation() = default;
-		};
-
-		struct IDerivativeSolver
-		{
-			virtual void Derive(const OdeState_t& curState, OdeState_t& outDerivative) = 0;
-			virtual ~IDerivativeSolver() = default;
-		};
-
-		struct IOdeSolver
-		{
-			virtual void NextState(const OdeState_t& curState, const float dt, OdeState_t& outNextState) = 0;
-			virtual ~IOdeSolver() = default;
 		};
 
 		namespace cpu

@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "../Simulation.hpp"
+#include "CpuInterfaces.h"
 
 #include "CMortonTree.hpp"
 #include "CLineSegment.hpp"
