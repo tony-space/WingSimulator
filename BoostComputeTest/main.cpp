@@ -1,17 +1,4 @@
-#define BOOST_CHRONO_HEADER_ONLY
-#define CL_TARGET_OPENCL_VERSION 120
-
-#include <iostream>
-#include <execution>
-
-#include <boost/compute/algorithm/copy.hpp>
-#include <boost/compute/algorithm/sort.hpp>
-#include <boost/compute/algorithm/transform.hpp>
-#include <boost/compute/container/vector.hpp>
-#include <boost/compute/function.hpp>
-#include <boost/compute/types/fundamental.hpp>
-
-#include <vector>
+#include "pch.hpp"
 
 int main()
 {
@@ -35,7 +22,7 @@ int main()
 	auto context = boost::compute::context(device);
 	auto queue = boost::compute::command_queue(context, device);
 
-	std::vector <float> data(512 * 1024 * 1024);
+	std::vector <float> data(32 * 1024 * 1024);
 	for (auto& f : data)
 	{
 		f = float(rand());
