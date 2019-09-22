@@ -1,4 +1,11 @@
 #pragma once
+#define GLEW_STATIC
+#define FREEGLUT_LIB_PRAGMAS 0
+#define FREEGLUT_STATIC
+#define _CRT_SECURE_NO_WARNINGS
+
+#define RENDERING_IMPL
+
 #include <cstdio>
 
 #include <stdexcept>

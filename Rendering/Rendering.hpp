@@ -4,6 +4,14 @@
 #include <memory>
 #include "../Simulation/Simulation.hpp"
 
+
+#ifndef RENDERING_IMPL
+#define RENDERING_API __declspec(dllimport)
+#else
+#define RENDERING_API __declspec(dllexport)
+#endif // !RENDERING_IMPL
+
+
 namespace wing2d
 {
 	namespace rendering
@@ -18,7 +26,7 @@ namespace wing2d
 
 		namespace opengl
 		{
-			std::unique_ptr<IRenderer> CreateRenderer(int argc, char** argv);
+			std::unique_ptr<IRenderer> RENDERING_API CreateRenderer(int argc, char** argv);
 		}
 	}
 }

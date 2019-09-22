@@ -1,5 +1,9 @@
 #pragma once
 
+#define SIMULATION_IMPL
+#define _CRT_SECURE_NO_WARNINGS
+#define GLM_FORCE_SWIZZLE
+
 #include <cfloat>
 #include <cassert>
 #include <cstdint>
@@ -12,7 +16,6 @@
 #include <numeric>
 #include <execution>
 
-#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
 #include <glm/matrix.hpp>
 #include <glm/gtc/matrix_transform.hpp>

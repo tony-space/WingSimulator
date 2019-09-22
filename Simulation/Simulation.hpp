@@ -6,6 +6,13 @@
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 
+#ifndef SIMULATION_IMPL
+#define SIMULATION_API __declspec(dllimport)
+#else
+#define SIMULATION_API __declspec(dllexport)
+#endif // !SIMULATION_IMPL
+
+
 namespace wing2d
 {
 	namespace simulation
@@ -56,12 +63,7 @@ namespace wing2d
 
 		namespace cpu
 		{
-			std::unique_ptr<ISimulation> CreateSimulation();
-		}
-
-		namespace cuda
-		{
-			std::unique_ptr<ISimulation> CreateSimulation();
+			std::unique_ptr<ISimulation> SIMULATION_API CreateSimulation();
 		}
 	}
 }
