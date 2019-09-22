@@ -65,5 +65,10 @@ namespace wing2d
 		{
 			std::unique_ptr<ISimulation> SIMULATION_API CreateSimulation();
 		}
+
+		namespace opencl
+		{
+			std::unique_ptr<ISimulation> SIMULATION_API CreateSimulation();
+		}
 	}
 }
