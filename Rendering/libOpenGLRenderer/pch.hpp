@@ -13,6 +13,7 @@
 #include <map>
 #include <string>
 #include <algorithm>
+#include <execution>
 
 #include <GL/glew.h>
 #include <GL/wglew.h>

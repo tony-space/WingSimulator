@@ -5,8 +5,7 @@
 #include <atomic>
 #include <glm/glm.hpp>
 
-#include "../Simulation.hpp"
-#include "CpuInterfaces.h"
+#include "CpuInterfaces.hpp"
 
 #include "CMortonTree.hpp"
 #include "CLineSegment.hpp"

@@ -3,8 +3,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
+#include <tuple>
 
 #ifndef SIMULATION_IMPL
 #define SIMULATION_API __declspec(dllimport)
@@ -19,6 +18,8 @@ namespace wing2d
 	{
 		struct SimulationState
 		{
+			typedef std::tuple<float, float> vec2;
+			typedef std::tuple<float, float, float, float> vec4;
 			struct
 			{
 				float width = 2.0f;
@@ -28,10 +29,10 @@ namespace wing2d
 			float particleRad = 0.01f;
 			size_t particles = 0;
 
-			std::vector<glm::vec2> pos;
-			std::vector<glm::vec2> vel;
-			std::vector<glm::vec4> color;
-			std::vector<glm::vec2> airfoil;
+			std::vector<vec2> pos;
+			std::vector<vec2> vel;
+			std::vector<vec4> color;
+			std::vector<vec2> airfoil;
 
 			bool IsValid() const
 			{
@@ -53,6 +54,11 @@ namespace wing2d
 		}
 
 		namespace opencl
+		{
+			std::unique_ptr<ISimulation> SIMULATION_API CreateSimulation();
+		}
+
+		namespace cuda
 		{
 			std::unique_ptr<ISimulation> SIMULATION_API CreateSimulation();
 		}

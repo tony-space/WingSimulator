@@ -29,8 +29,10 @@ private:
 	FILE* m_pFile;
 };
 
-std::vector<glm::vec2> LoadAirfoil(const char* path)
+std::vector<wing2d::simulation::SimulationState::vec2> LoadAirfoil(const char* path)
 {
+	using namespace wing2d::simulation;
+
 	CSmartFile pFile(path);
 
 	{
@@ -53,31 +55,30 @@ std::vector<glm::vec2> LoadAirfoil(const char* path)
 			throw std::runtime_error("Couldn't read the next vertex of airfoil");
 
 		result *= 0.5f;
-		return result;
+		return std::make_tuple(result.x, result.y);
 	};
 
-	std::deque<glm::vec2> deque;
-	std::vector<glm::vec2> airfoil;
+	std::deque<SimulationState::vec2> deque;
+	std::vector<SimulationState::vec2> airfoil;
 	std::generate_n(std::back_inserter(deque), vertices1, vertexParser);
 	std::generate_n(std::front_inserter(deque), vertices2, vertexParser);
 
-	std::set<std::tuple<float, float>> uniquePoints;
-	std::transform(deque.begin(), deque.end(), std::inserter(uniquePoints, uniquePoints.end()), [](const glm::vec2& v) { return std::make_tuple(v.x, v.y); });
-
+	std::set<SimulationState::vec2> uniquePoints(deque.cbegin(), deque.cend());
 	airfoil.reserve(uniquePoints.size());
-	std::copy_if(deque.cbegin(), deque.cend(), std::back_inserter(airfoil), [&](const glm::vec2& v)
-		{
-			auto it = uniquePoints.find(std::make_tuple(v.x, v.y));
-			auto isUnique = it != uniquePoints.end();
-			if (isUnique)
-				uniquePoints.erase(it);
-			return isUnique;
-		});
+
+	std::copy_if(deque.cbegin(), deque.cend(), std::back_inserter(airfoil), [&](const auto& v)
+	{
+		auto it = uniquePoints.find(v);
+		auto isUnique = it != uniquePoints.end();
+		if (isUnique)
+			uniquePoints.erase(it);
+		return isUnique;
+	});
 
 	return airfoil;
 }
 
-void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::vec2>&& airfoil)
+void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<wing2d::simulation::SimulationState::vec2>&& airfoil)
 {
 	wing2d::simulation::SimulationState state;
 	state.particleRad = kParticleRad;
@@ -90,22 +91,26 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<glm::ve
 
 	for (size_t i = 0; i < kParticles; ++i)
 	{
-		//state.pos[i].x = glm::linearRand(state.worldSize.width / -2.0f, state.worldSize.width / 2.0f);
-		//state.pos[i].y = glm::linearRand(0.25f, 1.0f);
-		state.pos[i].x = glm::linearRand(-4.0f, -1.25f);
-		state.pos[i].y = glm::linearRand(-1.0f, 1.0f);
+		auto x = glm::linearRand(-4.0f, -1.25f);
+		auto y = glm::linearRand(-1.0f, 1.0f);
 
-		state.vel[i] = glm::vec2(1.0f, 0.0f);
+		state.pos[i] = std::make_tuple(x, y);
+		state.vel[i] = std::make_tuple(1.0f, 0.0f);
 	}
 
 	glm::mat3 modelMat = glm::identity<glm::mat3>();
 	modelMat = glm::translate(modelMat, glm::vec2(-1.2f, 0.0f));
 	modelMat = glm::rotate(modelMat, -10.0f / 180.0f * float(M_PI));
 
-	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [&](const auto& a) -> glm::vec2
-		{
-			return (modelMat * glm::vec3(a, 1.0f)).xy;
-		});
+	std::transform(airfoil.cbegin(), airfoil.cend(), airfoil.begin(), [&](const auto& v)
+	{
+		auto& [x, y] = v;
+		auto vec = glm::vec3(x, y, 1.0f);
+
+		vec = modelMat * vec;
+
+		return std::make_tuple(vec.x, vec.y);
+	});
 
 	state.airfoil = std::move(airfoil);
 
@@ -129,10 +134,10 @@ int main(int argc, char** argv)
 		float dt = 0.001f;
 
 		renderer->SetOnUpdate([&]()
-			{
-				renderer->RenderAsync(simulation->GetState());
-				dt = simulation->Update(dt);
-			});
+		{
+			renderer->RenderAsync(simulation->GetState());
+			dt = simulation->Update(dt);
+		});
 
 		//renderer->InitWindowLoop(1920, 1080, true);
 		renderer->InitWindowLoop(1280, 720, false);

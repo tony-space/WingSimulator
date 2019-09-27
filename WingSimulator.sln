@@ -31,6 +31,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libCpuSimulation", "Simulat
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libOpenCLSimulation", "Simulation\libOpenCLSimulation\libOpenCLSimulation.vcxproj", "{6E2A42DD-A4FF-4921-8855-2AD7DB7F6854}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libCudaSimulation", "Simulation\libCudaSimulation\libCudaSimulation.vcxproj", "{115B50CE-5D60-48ED-807F-9107E4765081}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -95,6 +97,12 @@ Global
 		{6E2A42DD-A4FF-4921-8855-2AD7DB7F6854}.Release|x64.Build.0 = Release|x64
 		{6E2A42DD-A4FF-4921-8855-2AD7DB7F6854}.Release|x86.ActiveCfg = Release|Win32
 		{6E2A42DD-A4FF-4921-8855-2AD7DB7F6854}.Release|x86.Build.0 = Release|Win32
+		{115B50CE-5D60-48ED-807F-9107E4765081}.Debug|x64.ActiveCfg = Debug|x64
+		{115B50CE-5D60-48ED-807F-9107E4765081}.Debug|x64.Build.0 = Debug|x64
+		{115B50CE-5D60-48ED-807F-9107E4765081}.Debug|x86.ActiveCfg = Debug|x64
+		{115B50CE-5D60-48ED-807F-9107E4765081}.Release|x64.ActiveCfg = Release|x64
+		{115B50CE-5D60-48ED-807F-9107E4765081}.Release|x64.Build.0 = Release|x64
+		{115B50CE-5D60-48ED-807F-9107E4765081}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -106,6 +114,7 @@ Global
 		{3CACA575-F1CA-4CBF-B91B-3BAF0168E04C} = {08EBEA29-54C0-4324-8CF9-DBF0BA8BB118}
 		{1B87AD0D-4483-4B3F-BA2C-BB4E2847084C} = {BDDD418B-49F5-4E49-8A42-7DC5D5076EB9}
 		{6E2A42DD-A4FF-4921-8855-2AD7DB7F6854} = {BDDD418B-49F5-4E49-8A42-7DC5D5076EB9}
+		{115B50CE-5D60-48ED-807F-9107E4765081} = {BDDD418B-49F5-4E49-8A42-7DC5D5076EB9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {26F9CB6F-41EC-4A9D-AD8E-F65BEB3438E3}

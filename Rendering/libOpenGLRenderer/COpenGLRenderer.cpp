@@ -97,11 +97,26 @@ void COpenGLRenderer::RenderAsync(const simulation::SimulationState& state)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
+	m_pos.resize(state.pos.size());
+	m_color.resize(state.color.size());
+
+	std::transform(std::execution::par_unseq, state.pos.cbegin(), state.pos.cend(), m_pos.begin(), [](const auto& t)
+	{
+		auto& [x, y] = t;
+		return glm::vec2(x, y);
+	});
+
+	std::transform(std::execution::par_unseq, state.color.cbegin(), state.color.cend(), m_color.begin(), [](const auto& t)
+	{
+		auto& [r, g, b, a] = t;
+		return glm::vec4(r, g, b, a);
+	});
+
 	glBindBuffer(GL_ARRAY_BUFFER, m_vboPos);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * state.pos.size(), state.pos.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * m_pos.size(), m_pos.data(), GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * state.color.size(), state.color.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * m_color.size(), m_color.data(), GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	{
@@ -118,7 +133,10 @@ void COpenGLRenderer::RenderAsync(const simulation::SimulationState& state)
 	glColor3f(0.75f, 0.75f, 0.75f);
 	glBegin(GL_LINE_LOOP);
 	for (const auto& v : state.airfoil)
-		glVertex2fv(glm::value_ptr(v));
+	{
+		auto& [x, y] = v;
+		glVertex2f(x, y);
+	}
 	glEnd();
 
 	/*glColor3f(1.0f, 1.0f, 1.0f);

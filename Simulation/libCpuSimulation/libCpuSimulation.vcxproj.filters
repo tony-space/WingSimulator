@@ -8,7 +8,7 @@
     <ClInclude Include="CLineSegment.hpp" />
     <ClInclude Include="CDerivativeSolver.hpp" />
     <ClInclude Include="CBoundingBox.hpp" />
-    <ClInclude Include="CpuInterfaces.h" />
+    <ClInclude Include="CpuInterfaces.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />

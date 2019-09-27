@@ -206,6 +206,9 @@
     <ProjectReference Include="..\Simulation\libCpuSimulation\libCpuSimulation.vcxproj">
       <Project>{1b87ad0d-4483-4b3f-ba2c-bb4e2847084c}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\Simulation\libCudaSimulation\libCudaSimulation.vcxproj">
+      <Project>{115b50ce-5d60-48ed-807f-9107e4765081}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Simulation\libOpenCLSimulation\libOpenCLSimulation.vcxproj">
       <Project>{6e2a42dd-a4ff-4921-8855-2ad7db7f6854}</Project>
     </ProjectReference>

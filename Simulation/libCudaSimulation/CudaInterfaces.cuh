@@ -1,0 +1,31 @@
+#pragma once
+
+#include <thrust/system/cuda/experimental/pinned_allocator.h>
+
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+#include <helper_math.h>
+
+namespace wing2d
+{
+	namespace simulation
+	{
+		namespace cuda
+		{
+			typedef thrust::device_vector<float2> OdeState_t;
+			typedef thrust::device_vector<float2, thrust::system::cuda::experimental::pinned_allocator<float2>> OdeStateHost_t;
+
+			struct IDerivativeSolver
+			{
+				virtual void Derive(const OdeState_t& curState, OdeState_t& outDerivative) = 0;
+				virtual ~IDerivativeSolver() = default;
+			};
+
+			struct IOdeSolver
+			{
+				virtual void NextState(const thrust::device_ptr<float>& dt, const OdeState_t& curState, OdeState_t& outNextState) = 0;
+				virtual ~IOdeSolver() = default;
+			};
+		}
+	}
+}

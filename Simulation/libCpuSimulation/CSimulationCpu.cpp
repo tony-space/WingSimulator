@@ -4,7 +4,7 @@
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::cpu;
 
-glm::vec4 getHeatMapColor(float value)
+static SimulationState::vec4 getHeatMapColor(float value)
 {
 	value = fminf(fmaxf(value, 0.0f), 1.0f);
 
@@ -14,7 +14,20 @@ glm::vec4 getHeatMapColor(float value)
 	int idx1 = int(value);
 	int idx2 = idx1 + 1;
 	float fract1 = value - float(idx1);
-	return glm::vec4(heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]), 1.0f);
+	auto result = heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]);
+
+	return std::make_tuple(result.x, result.y, result.z, 1.0f);
+}
+
+static SimulationState::vec2 VecToTuple(const glm::vec2& v)
+{
+	return std::make_tuple(v.x, v.y);
+};
+
+static glm::vec2 TupleToVec(const SimulationState::vec2& v)
+{
+	auto& [x, y] = v;
+	return glm::vec2(x, y);
 }
 
 std::unique_ptr<ISimulation> wing2d::simulation::cpu::CreateSimulation()
@@ -39,8 +52,8 @@ void CSimulationCpu::ResetState(const SimulationState& state)
 	auto pos = m_curOdeState.begin();
 	auto vel = pos + m_state.particles;
 
-	std::copy(std::execution::par_unseq, m_state.pos.cbegin(), m_state.pos.cend(), pos);
-	std::copy(std::execution::par_unseq, m_state.vel.cbegin(), m_state.vel.cend(), vel);
+	std::transform(std::execution::par_unseq, m_state.pos.cbegin(), m_state.pos.cend(), pos, TupleToVec);
+	std::transform(std::execution::par_unseq, m_state.vel.cbegin(), m_state.vel.cend(), vel, TupleToVec);
 
 	m_odeSolver = std::make_unique<CForwardEulerSolver>(std::make_unique<CDerivativeSolver>(*this));
 }
@@ -93,8 +106,8 @@ const SimulationState& CSimulationCpu::GetState() const
 	auto vel = pos + m_state.particles;
 	auto end = m_curOdeState.cend();
 
-	std::copy(std::execution::par_unseq, pos, vel, m_state.pos.begin());
-	std::copy(std::execution::par_unseq, vel, end, m_state.vel.begin());
+	std::transform(std::execution::par_unseq, pos, vel, m_state.pos.begin(), VecToTuple);
+	std::transform(std::execution::par_unseq, vel, end, m_state.vel.begin(), VecToTuple);
 
 	return m_state;
 }
@@ -129,14 +142,21 @@ void CSimulationCpu::BuildWalls()
 
 	m_walls.clear();
 	m_walls.emplace_back(topRight, topLeft);
-	//m_walls.emplace_back(topLeft, bottomLeft);
 	m_walls.emplace_back(bottomLeft, bottomRight);
-	//m_walls.emplace_back(bottomRight, topRight);
 }
 
 void CSimulationCpu::BuildWing()
 {
+	m_wing.clear();
+
+	auto createSegment = [](const SimulationState::vec2& a, const SimulationState::vec2& b)
+	{
+		auto& [x1, y1] = a;
+		auto& [x2, y2] = b;
+		return CLineSegment(glm::vec2(x1, y1), glm::vec2(x2, y2));
+	};
+
 	for (size_t i = 0; i < m_state.airfoil.size() - 1; ++i)
-		m_wing.emplace_back(m_state.airfoil[i], m_state.airfoil[i + 1]);
-	m_wing.emplace_back(m_state.airfoil.back(), m_state.airfoil.front());
+		m_wing.emplace_back(createSegment(m_state.airfoil[i], m_state.airfoil[i + 1]));
+	m_wing.emplace_back(createSegment(m_state.airfoil.back(), m_state.airfoil.front()));
 }

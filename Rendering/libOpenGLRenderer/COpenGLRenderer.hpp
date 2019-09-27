@@ -1,4 +1,6 @@
 #pragma once
+#include <glm/glm.hpp>
+
 #include "../Rendering.hpp"
 #include "CShaderProgram.hpp"
 
@@ -27,6 +29,9 @@ namespace wing2d
 
 				//x - width, y - height, z - aspect ratio
 				glm::vec3 m_window;
+
+				std::vector<glm::vec2> m_pos;
+				std::vector<glm::vec4> m_color;
 
 				void InitScene();
 

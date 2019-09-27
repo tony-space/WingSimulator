@@ -176,7 +176,7 @@
     <ClInclude Include="CLineSegment.hpp" />
     <ClInclude Include="CMortonTree.hpp" />
     <ClInclude Include="CSimulationCpu.hpp" />
-    <ClInclude Include="CpuInterfaces.h" />
+    <ClInclude Include="CpuInterfaces.hpp" />
     <ClInclude Include="OdeSolvers.hpp" />
     <ClInclude Include="pch.hpp" />
   </ItemGroup>
