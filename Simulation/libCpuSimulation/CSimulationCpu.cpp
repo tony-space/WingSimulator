@@ -100,7 +100,7 @@ void CSimulationCpu::ColorParticles(float dt)
 	});
 }
 
-const SimulationState& CSimulationCpu::GetState() const
+const SimulationState& CSimulationCpu::GetState()
 {
 	auto pos = m_curOdeState.cbegin();
 	auto vel = pos + m_state.particles;

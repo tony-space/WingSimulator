@@ -44,7 +44,7 @@ namespace wing2d
 		{
 			virtual void ResetState(const SimulationState& state) = 0;
 			virtual float Update(float dt) = 0;
-			virtual const SimulationState& GetState() const = 0;
+			virtual const SimulationState& GetState() = 0;
 			virtual ~ISimulation() = default;
 		};
 

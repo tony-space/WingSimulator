@@ -21,7 +21,7 @@ namespace wing2d
 
 				void ColorParticles(float dt);
 
-				virtual const SimulationState& GetState() const override;
+				virtual const SimulationState& GetState() override;
 
 				size_t GetParticlesCount() const;
 				float GetParticleRadius() const;
@@ -29,7 +29,7 @@ namespace wing2d
 				const std::vector<CLineSegment>& GetWalls() const;
 				const std::vector<CLineSegment>& GetWing() const;
 			private:
-				mutable wing2d::simulation::SimulationState m_state;
+				wing2d::simulation::SimulationState m_state;
 
 				std::unique_ptr<IOdeSolver> m_odeSolver = nullptr;
 

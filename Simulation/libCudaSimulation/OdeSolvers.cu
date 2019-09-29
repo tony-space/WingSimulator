@@ -7,7 +7,7 @@
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::cuda;
 
-__global__ void SaxpyKernel(const float* __restrict__ pDt, const size_t nElements, const float2* __restrict__ state, const float2* __restrict__ derivative, float2* __restrict__ nextState)
+static __global__ void SaxpyKernel(const float* __restrict__ pDt, const size_t nElements, const float2* __restrict__ state, const float2* __restrict__ derivative, float2* __restrict__ nextState)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	const auto dt = *pDt;

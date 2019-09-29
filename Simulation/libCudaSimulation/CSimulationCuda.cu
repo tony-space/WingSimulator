@@ -1,3 +1,7 @@
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
 #include <algorithm>
 
 #define SIMULATION_IMPL
@@ -6,13 +10,76 @@
 #include "OdeSolvers.cuh"
 #include "CDerivativeSolver.cuh"
 
-
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::cuda;
+
+static __device__ float4 GetHeatMapColor(float value)
+{
+	value = fminf(fmaxf(value, 0.0f), 1.0f);
+
+	static const size_t stages = 7;
+	static const float3 heatMap[stages] = { {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f} };
+	value *= stages - 1;
+	int idx1 = int(value);
+	int idx2 = idx1 + 1;
+	float fract1 = value - float(idx1);
+	auto result = heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]);
+
+	return make_float4(result, 1.0f);
+}
+
+static __global__ void ColorParticlesKernel(const float* __restrict__ pDt, const size_t nParticles, const float2* __restrict__ lastVel, const float2* __restrict__ nextVel, float4* __restrict__ color)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= nParticles)
+		return;
+
+	auto force = (nextVel[threadId] - lastVel[threadId]) / *pDt;
+	color[threadId] = GetHeatMapColor(logf(length(force) + 1.0f) / 10.0f + 0.15f);
+}
+
 
 static float2 TupleToVec(const SimulationState::vec2& v)
 {
 	return make_float2(std::get<0>(v), std::get<1>(v));
+}
+
+
+static SimulationState::vec2 VecToTuple2D(const float2& v)
+{
+	return std::make_tuple(v.x, v.y);
+};
+
+static SimulationState::vec4 VecToTuple4D(const float4& v)
+{
+	return std::make_tuple(v.x, v.y, v.z, v.w);
+};
+
+static Segments_t BuildWalls(const SimulationState& state)
+{
+	auto corner = make_float2(state.worldSize.width / 2.0f, state.worldSize.height / 2.0f);
+	auto topLeft = make_float2(-corner.x, corner.y);
+	auto topRight = make_float2(corner.x, corner.y);
+	auto bottomRight = make_float2(corner.x, -corner.y);
+	auto bottomLeft = make_float2(-corner.x, -corner.y);
+
+	Segments_t result;
+
+	result.emplace_back(std::make_tuple(topRight, topLeft));
+	result.emplace_back(std::make_tuple(bottomLeft, bottomRight));
+
+	return result;
+}
+
+static Segments_t BuildAirfoil(const SimulationState& state)
+{
+	Segments_t result;
+
+	for (size_t i = 0; i < state.airfoil.size() - 1; ++i)
+		result.emplace_back(std::make_tuple(TupleToVec(state.airfoil[i]), TupleToVec(state.airfoil[i + 1])));
+	result.emplace_back(std::make_tuple(TupleToVec(state.airfoil.back()), TupleToVec(state.airfoil.front())));
+
+	return result;
 }
 
 std::unique_ptr<ISimulation> wing2d::simulation::cuda::CreateSimulation()
@@ -28,34 +95,58 @@ void CSimulationCuda::ResetState(const SimulationState& state)
 
 	CopyToGPU();
 
-	auto wing = CDerivativeSolver::segments_t();
-	auto walls = CDerivativeSolver::segments_t();
-
-	m_odeSolver = std::make_unique<CForwardEulerSolver>(std::make_unique<CDerivativeSolver>(m_state.particles, m_state.particleRad, wing, walls));
+	auto derivativeSolver = std::make_unique<CDerivativeSolver>(m_state.particles, m_state.particleRad, BuildAirfoil(m_state), BuildWalls(m_state));
+	m_odeSolver = std::make_unique<CForwardEulerSolver>(std::move(derivativeSolver));
 }
 
 float CSimulationCuda::Update(float dt)
 {
+	cudaMemcpyAsync(m_dt.get(), &dt, sizeof(dt), cudaMemcpyKind::cudaMemcpyHostToDevice);
 	m_odeSolver->NextState(m_dt, m_curOdeState, m_nextOdeState);
+	
+	ColorParticles();
+
 	m_nextOdeState.swap(m_curOdeState);
 
-	return 0.0f;
+	return dt;
 }
 
-const SimulationState& CSimulationCuda::GetState() const
+void CSimulationCuda::ColorParticles()
 {
+	dim3 blockDim(64);
+	dim3 gridDim((unsigned(m_state.particles) - 1) / blockDim.x + 1);
+
+	const float2* lastVel = m_curOdeState.data().get() + m_state.particles;
+	const float2* nextVel = m_nextOdeState.data().get() + m_state.particles;
+	float4* colors = m_deviceColors.data().get();
+
+	ColorParticlesKernel <<<gridDim, blockDim >>> (m_dt.get(), m_state.particles, lastVel, nextVel, colors);
+	m_hostColors = m_deviceColors;
+	std::transform(m_hostColors.cbegin(), m_hostColors.cend(), m_state.color.begin(), VecToTuple4D);
+}
+
+const SimulationState& CSimulationCuda::GetState()
+{
+	m_hostOdeState = m_curOdeState;
+	std::transform(m_hostOdeState.cbegin(), m_hostOdeState.cbegin() + m_state.particles, m_state.pos.begin(), VecToTuple2D);
+	std::transform(m_hostOdeState.cbegin() + m_state.particles, m_hostOdeState.cend(), m_state.vel.begin(), VecToTuple2D);
+
 	return m_state;
 }
 
 void CSimulationCuda::CopyToGPU()
 {
 	const size_t& particles = m_state.particles;
-		
-	OdeStateHost_t posBuf(particles);
-	OdeStateHost_t velBuf(particles);
+
+	PinnedHostVector2D_t posBuf(particles);
+	PinnedHostVector2D_t velBuf(particles);
 
 	m_curOdeState.resize(particles * 2);
 	m_nextOdeState.resize(particles * 2);
+	m_hostOdeState.resize(particles * 2);
+	
+	m_deviceColors.resize(particles);
+	m_hostColors.resize(particles);
 
 	std::transform(m_state.pos.cbegin(), m_state.pos.cend(), posBuf.begin(), TupleToVec);
 	std::transform(m_state.vel.cbegin(), m_state.vel.cend(), velBuf.begin(), TupleToVec);

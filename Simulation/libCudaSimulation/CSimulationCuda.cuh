@@ -17,7 +17,7 @@ namespace wing2d
 			public:
 				virtual void ResetState(const SimulationState& state) override;
 				virtual float Update(float dt) override;
-				virtual const SimulationState& GetState() const override;
+				virtual const SimulationState& GetState() override;
 
 			private:
 				OdeState_t m_curOdeState;
@@ -26,9 +26,16 @@ namespace wing2d
 				SimulationState m_state;
 
 				std::unique_ptr<IOdeSolver> m_odeSolver;
+
 				thrust::device_ptr<float> m_dt = thrust::device_malloc<float>(1);
+				
+				thrust::device_vector<float4> m_deviceColors;
+				PinnedHostVector4D_t m_hostColors;
+
+				PinnedHostVector2D_t m_hostOdeState;
 
 				void CopyToGPU();
+				void ColorParticles();
 			};
 		}
 	}

@@ -12,8 +12,14 @@ namespace wing2d
 	{
 		namespace cuda
 		{
+			typedef thrust::host_vector<float, thrust::system::cuda::experimental::pinned_allocator<float>> PinnedHostVector1D_t;
+			typedef thrust::host_vector<float2, thrust::system::cuda::experimental::pinned_allocator<float2>> PinnedHostVector2D_t;
+			typedef thrust::host_vector<float4, thrust::system::cuda::experimental::pinned_allocator<float4>> PinnedHostVector4D_t;
+
 			typedef thrust::device_vector<float2> OdeState_t;
-			typedef thrust::device_vector<float2, thrust::system::cuda::experimental::pinned_allocator<float2>> OdeStateHost_t;
+
+			typedef std::tuple<float2, float2> LineSegment_t;
+			typedef std::vector<LineSegment_t> Segments_t;
 
 			struct IDerivativeSolver
 			{
