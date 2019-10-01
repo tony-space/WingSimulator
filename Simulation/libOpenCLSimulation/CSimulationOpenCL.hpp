@@ -12,7 +12,7 @@ namespace wing2d
 			{
 				virtual void ResetState(const SimulationState& state) override;
 				virtual float Update(float dt) override;
-				virtual const SimulationState& GetState() const override;
+				virtual const SimulationState& GetState() override;
 
 			private:
 

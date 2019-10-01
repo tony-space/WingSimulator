@@ -19,7 +19,7 @@ float CSimulationOpenCL::Update(float dt)
 	return 0.0f;
 }
 
-const SimulationState& CSimulationOpenCL::GetState() const
+const SimulationState& CSimulationOpenCL::GetState()
 {
 	return m_state;
 }
