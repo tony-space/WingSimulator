@@ -1,4 +1,17 @@
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
 #include "CDerivativeSolver.cuh"
+
+static __global__ void AddGravityKernel(float2* forces, unsigned n)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= n)
+		return;
+
+	forces[threadId].x += 0.5f;
+}
 
 using namespace wing2d::simulation::cuda;
 
@@ -14,8 +27,50 @@ CDerivativeSolver::CDerivativeSolver(size_t particles, float radius, const Segme
 
 void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDerivative)
 {
-
+	ResetForces();
+	BuildParticlesTree(curState);
+	ResolveParticleParticleCollisions(curState);
+	ResolveParticleWingCollisions(curState);
+	ParticleToWall(curState);
+	ApplyGravity();
 	BuildDerivative(curState, outDerivative);
+}
+
+void CDerivativeSolver::ResetForces()
+{
+	auto devPtr = m_forces.data().get();
+	auto bytesSize = m_forces.size() * sizeof(decltype(m_forces)::value_type);
+	cudaMemsetAsync(devPtr, 0, bytesSize);
+}
+
+void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
+{
+
+}
+
+void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
+{
+
+}
+
+void CDerivativeSolver::ResolveParticleWingCollisions(const OdeState_t& curState)
+{
+
+}
+
+void CDerivativeSolver::ParticleToWall(const OdeState_t& curState)
+{
+
+}
+
+void CDerivativeSolver::ApplyGravity()
+{
+	auto elements = unsigned(m_forces.size());
+
+	dim3 blockDim(64);
+	dim3 gridDim((elements - 1) / blockDim.x + 1);
+
+	AddGravityKernel <<<gridDim, blockDim >>> (m_forces.data().get(), elements);
 }
 
 void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const

@@ -43,6 +43,7 @@ namespace wing2d
 				void ResolveParticleWingCollisions(const OdeState_t& curState);
 				void ParticleToWall(const OdeState_t& curState);
 				void ApplyGravity();
+				void BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const;
 
 
 				static glm::vec2 ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter);

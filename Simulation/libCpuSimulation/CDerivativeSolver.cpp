@@ -51,9 +51,7 @@ void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDeriva
 	ResolveParticleWingCollisions(curState);
 	ParticleToWall(curState);
 	ApplyGravity();
-
-	std::copy(std::execution::par_unseq, curState.cbegin() + m_particles, curState.cend(), outDerivative.begin());
-	std::copy(std::execution::par_unseq, m_forces.cbegin(), m_forces.cend(), outDerivative.begin() + m_particles);
+	BuildDerivative(curState, outDerivative);
 }
 
 glm::vec2 CDerivativeSolver::ComputeForce(const glm::vec2& pos1, const glm::vec2& vel1, const glm::vec2& pos2, const glm::vec2& vel2, float diameter)
@@ -211,4 +209,10 @@ void CDerivativeSolver::ApplyGravity()
 		force.x += 0.5f;
 		return force;
 	});
+}
+
+void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const
+{
+	std::copy(std::execution::par_unseq, curState.cbegin() + m_particles, curState.cend(), outDerivative.begin());
+	std::copy(std::execution::par_unseq, m_forces.cbegin(), m_forces.cend(), outDerivative.begin() + m_particles);
 }

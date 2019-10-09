@@ -30,6 +30,12 @@ namespace wing2d
 
 				thrust::device_vector<float2> m_forces;
 
+				void ResetForces();
+				void BuildParticlesTree(const OdeState_t& curState);
+				void ResolveParticleParticleCollisions(const OdeState_t& curState);
+				void ResolveParticleWingCollisions(const OdeState_t& curState);
+				void ParticleToWall(const OdeState_t& curState);
+				void ApplyGravity();
 				void BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const;
 			};
 		}

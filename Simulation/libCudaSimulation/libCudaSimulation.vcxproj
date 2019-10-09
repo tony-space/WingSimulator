@@ -88,6 +88,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BoundingBox.cuh" />
     <ClInclude Include="CDerivativeSolver.cuh" />
     <ClInclude Include="CSimulationCuda.cuh" />
     <ClInclude Include="CudaInterfaces.cuh" />
@@ -95,6 +96,7 @@
     <ClInclude Include="OdeSolvers.cuh" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="BoundingBox.cu" />
     <CudaCompile Include="CDerivativeSolver.cu" />
     <CudaCompile Include="CSimulationCuda.cu" />
     <CudaCompile Include="LineSegments.cu" />
