@@ -6,7 +6,8 @@
 #include <helper_math.h>
 
 #include "CudaInterfaces.cuh"
-#include "LineSegments.cuh"
+#include "LineSegment.cuh"
+#include "BoundingBox.cuh"
 
 namespace wing2d
 {
@@ -24,6 +25,7 @@ namespace wing2d
 			private:
 				CLineSegmentsStorage m_airfoilStorage;
 				CLineSegmentsStorage m_wallsStorage;
+				CBoundingBoxesStorage m_particlesBoxesStorage;
 
 				const size_t m_particles;
 				const float m_particleRad;

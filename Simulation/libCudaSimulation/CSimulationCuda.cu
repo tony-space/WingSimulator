@@ -113,8 +113,8 @@ float CSimulationCuda::Update(float dt)
 
 void CSimulationCuda::ColorParticles()
 {
-	dim3 blockDim(64);
-	dim3 gridDim((unsigned(m_state.particles) - 1) / blockDim.x + 1);
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_state.particles, kBlockSize));
 
 	const float2* lastVel = m_curOdeState.data().get() + m_state.particles;
 	const float2* nextVel = m_nextOdeState.data().get() + m_state.particles;

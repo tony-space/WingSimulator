@@ -28,13 +28,12 @@ CForwardEulerSolver::CForwardEulerSolver(std::unique_ptr<IDerivativeSolver>&& de
 
 void CForwardEulerSolver::NextState(const thrust::device_ptr<float>& dt, const OdeState_t& curState, OdeState_t& outNextState)
 {
-	m_derivative.resize(curState.size());
+	auto elements = curState.size();
+	m_derivative.resize(elements);
 	m_derivativeSolver->Derive(curState, m_derivative);
 
-	auto elements = unsigned(curState.size());
-
-	dim3 blockDim(64);
-	dim3 gridDim((elements - 1) / blockDim.x + 1);
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(elements, kBlockSize));
 
 	SaxpyKernel<<<gridDim, blockDim >>> (dt.get(), elements, curState.data().get(), m_derivative.data().get(), outNextState.data().get());
 }

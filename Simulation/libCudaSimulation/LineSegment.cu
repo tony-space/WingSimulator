@@ -1,7 +1,7 @@
 #include <vector>
 #include <algorithm>
 
-#include "LineSegments.cuh"
+#include "LineSegment.cuh"
 
 using namespace wing2d::simulation::cuda;
 
