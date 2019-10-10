@@ -9,6 +9,8 @@
 
 #include "OdeSolvers.cuh"
 #include "CDerivativeSolver.cuh"
+#include "CudaLaunchHelpers.cuh"
+
 
 using namespace wing2d::simulation;
 using namespace wing2d::simulation::cuda;
@@ -101,7 +103,7 @@ void CSimulationCuda::ResetState(const SimulationState& state)
 
 float CSimulationCuda::Update(float dt)
 {
-	cudaMemcpyAsync(m_dt.get(), &dt, sizeof(dt), cudaMemcpyKind::cudaMemcpyHostToDevice);
+	CudaSafeCall(cudaMemcpyAsync(m_dt.get(), &dt, sizeof(dt), cudaMemcpyKind::cudaMemcpyHostToDevice));
 	m_odeSolver->NextState(m_dt, m_curOdeState, m_nextOdeState);
 	
 	ColorParticles();
@@ -121,6 +123,8 @@ void CSimulationCuda::ColorParticles()
 	float4* colors = m_deviceColors.data().get();
 
 	ColorParticlesKernel <<<gridDim, blockDim >>> (m_dt.get(), m_state.particles, lastVel, nextVel, colors);
+	CudaCheckError();
+
 	m_hostColors = m_deviceColors;
 	std::transform(m_hostColors.cbegin(), m_hostColors.cend(), m_state.color.begin(), VecToTuple4D);
 }

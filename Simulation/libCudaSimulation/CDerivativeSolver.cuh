@@ -8,6 +8,7 @@
 #include "CudaInterfaces.cuh"
 #include "LineSegment.cuh"
 #include "BoundingBox.cuh"
+#include "CMortonTree.cuh"
 
 namespace wing2d
 {
@@ -31,6 +32,8 @@ namespace wing2d
 				const float m_particleRad;
 
 				thrust::device_vector<float2> m_forces;
+
+				CMortonTree m_particlesTree;
 
 				void ResetForces();
 				void BuildParticlesTree(const OdeState_t& curState);

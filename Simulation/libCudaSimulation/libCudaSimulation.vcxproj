@@ -90,14 +90,17 @@
   <ItemGroup>
     <ClInclude Include="BoundingBox.cuh" />
     <ClInclude Include="CDerivativeSolver.cuh" />
+    <ClInclude Include="CMortonTree.cuh" />
     <ClInclude Include="CSimulationCuda.cuh" />
     <ClInclude Include="CudaInterfaces.cuh" />
+    <ClInclude Include="CudaLaunchHelpers.cuh" />
     <ClInclude Include="LineSegment.cuh" />
     <ClInclude Include="OdeSolvers.cuh" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="BoundingBox.cu" />
     <CudaCompile Include="CDerivativeSolver.cu" />
+    <CudaCompile Include="CMortonTree.cu" />
     <CudaCompile Include="CSimulationCuda.cu" />
     <CudaCompile Include="LineSegment.cu" />
     <CudaCompile Include="OdeSolvers.cu" />

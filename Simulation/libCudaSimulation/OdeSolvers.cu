@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
+#include "CudaLaunchHelpers.cuh"
 #include "OdeSolvers.cuh"
 
 using namespace wing2d::simulation;
@@ -36,4 +37,5 @@ void CForwardEulerSolver::NextState(const thrust::device_ptr<float>& dt, const O
 	dim3 gridDim(GridSize(elements, kBlockSize));
 
 	SaxpyKernel<<<gridDim, blockDim >>> (dt.get(), elements, curState.data().get(), m_derivative.data().get(), outNextState.data().get());
+	CudaCheckError();
 }

@@ -32,12 +32,6 @@ namespace wing2d
 				virtual void NextState(const thrust::device_ptr<float>& dt, const OdeState_t& curState, OdeState_t& outNextState) = 0;
 				virtual ~IOdeSolver() = default;
 			};
-
-			constexpr unsigned kBlockSize = 64;
-			inline unsigned GridSize(size_t elements, unsigned blockSize)
-			{
-				return (unsigned(elements) - 1) / blockSize + 1;
-			}
 		}
 	}
 }

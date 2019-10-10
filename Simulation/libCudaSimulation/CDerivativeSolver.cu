@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
+#include "CudaLaunchHelpers.cuh"
 #include "CDerivativeSolver.cuh"
 
 using namespace wing2d::simulation::cuda;
@@ -55,7 +56,7 @@ void CDerivativeSolver::ResetForces()
 {
 	auto devPtr = m_forces.data().get();
 	auto bytesSize = m_particles * sizeof(decltype(m_forces)::value_type);
-	cudaMemsetAsync(devPtr, 0, bytesSize);
+	CudaSafeCall(cudaMemsetAsync(devPtr, 0, bytesSize));
 }
 
 void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
@@ -63,7 +64,13 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(m_particles, kBlockSize));
 
-	BuildParticlesBoundingBoxes<<<blockDim, gridDim>>>(m_particlesBoxesStorage.get(), m_particleRad, curState.data().get());
+
+	auto boxesStorage = m_particlesBoxesStorage.get();
+
+	BuildParticlesBoundingBoxes<<<gridDim, blockDim >>>(boxesStorage, m_particleRad, curState.data().get());
+	CudaCheckError();
+
+	m_particlesTree.Build(boxesStorage);
 }
 
 void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
@@ -88,6 +95,7 @@ void CDerivativeSolver::ApplyGravity()
 	dim3 gridDim((elements - 1) / blockDim.x + 1);
 
 	AddGravityKernel <<<gridDim, blockDim >>> (m_forces.data().get(), elements);
+	CudaCheckError();
 }
 
 void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const
@@ -98,6 +106,6 @@ void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& 
 
 	const size_t dataBlockSize = m_particles * sizeof(float2);
 
-	cudaMemcpyAsync(d_derivative, d_velocities, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice);
-	cudaMemcpyAsync(d_derivative + m_particles, d_forces, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice);
+	CudaSafeCall(cudaMemcpyAsync(d_derivative, d_velocities, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice));
+	CudaSafeCall(cudaMemcpyAsync(d_derivative + m_particles, d_forces, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice));
 }
