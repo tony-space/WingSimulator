@@ -15,7 +15,7 @@ namespace wing2d
 			class CMortonTree
 			{
 			public:
-				void Build(const SBoundingBoxSOA& leafs);
+				void Build(const SBoundingBoxesSOA& leafs);
 			private:
 				struct
 				{
@@ -24,7 +24,19 @@ namespace wing2d
 					thrust::device_vector<uint8_t> m_cubReductionTempStorage;
 				} m_sceneBox;
 
-				void EvaluateSceneBox(const SBoundingBoxSOA& leafs);
+				struct
+				{
+					thrust::device_vector<uint32_t> unsortedCodes;
+					thrust::device_vector<size_t> unsortedKeys;
+
+					thrust::device_vector<uint32_t> sortedCodes;
+					thrust::device_vector<size_t> sortedKeys;
+
+					thrust::device_vector<uint8_t> m_cubSortTempStorage;
+				} m_mortonCodes;
+
+				void EvaluateSceneBox(const SBoundingBoxesSOA& leafs);
+				void GenerateMortonCodes(const size_t objects);
 			};
 		}
 	}

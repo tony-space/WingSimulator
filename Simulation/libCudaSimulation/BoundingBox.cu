@@ -8,7 +8,7 @@ CBoundingBoxesStorage::CBoundingBoxesStorage(size_t count)
 	m_max.resize(count);
 }
 
-SBoundingBoxSOA CBoundingBoxesStorage::get()
+SBoundingBoxesSOA CBoundingBoxesStorage::get()
 {
 	return
 	{

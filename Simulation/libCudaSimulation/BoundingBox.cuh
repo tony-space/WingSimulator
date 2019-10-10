@@ -9,7 +9,7 @@ namespace wing2d
 	{
 		namespace cuda
 		{
-			struct SBoundingBoxSOA
+			struct SBoundingBoxesSOA
 			{
 				const size_t  boundingBoxes;
 				float2* const __restrict__ min;
@@ -20,7 +20,7 @@ namespace wing2d
 			{
 			public:
 				CBoundingBoxesStorage(size_t count);
-				SBoundingBoxSOA get();
+				SBoundingBoxesSOA get();
 			private:
 				thrust::device_vector<float2> m_min;
 				thrust::device_vector<float2> m_max;

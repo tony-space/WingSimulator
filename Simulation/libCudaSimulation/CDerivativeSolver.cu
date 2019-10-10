@@ -16,7 +16,7 @@ static __global__ void AddGravityKernel(float2* forces, unsigned n)
 	forces[threadId].x += 0.5f;
 }
 
-static __global__ void BuildParticlesBoundingBoxes(SBoundingBoxSOA boundingBoxes, const float particleRad, const float2* __restrict__ particlePos)
+static __global__ void BuildParticlesBoundingBoxes(SBoundingBoxesSOA boundingBoxes, const float particleRad, const float2* __restrict__ particlePos)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= boundingBoxes.boundingBoxes)
