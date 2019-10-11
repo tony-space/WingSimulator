@@ -15,6 +15,22 @@ namespace wing2d
 			class CMortonTree
 			{
 			public:
+				enum class NodeType
+				{
+					Leaf,
+					Internal
+				};
+				struct STreeNode
+				{
+					NodeType type;
+					int atomicVisited;
+
+					float4 box;
+					STreeNode* parent;
+					STreeNode* left;
+					STreeNode* right;
+				};
+
 				void Build(const SBoundingBoxesSOA& leafs);
 			private:
 				struct
@@ -27,16 +43,27 @@ namespace wing2d
 				struct
 				{
 					thrust::device_vector<uint32_t> unsortedCodes;
-					thrust::device_vector<size_t> unsortedKeys;
+					thrust::device_vector<size_t> unsortedIndices;
 
 					thrust::device_vector<uint32_t> sortedCodes;
-					thrust::device_vector<size_t> sortedKeys;
+					thrust::device_vector<size_t> sortedIndices;
 
 					thrust::device_vector<uint8_t> m_cubSortTempStorage;
 				} m_mortonCodes;
 
+				struct
+				{
+					thrust::device_vector<STreeNode> leafNodesPool;
+					thrust::device_vector<STreeNode> internalNodesPool;
+					STreeNode* root = nullptr;
+				} m_tree;
+
 				void EvaluateSceneBox(const SBoundingBoxesSOA& leafs);
 				void GenerateMortonCodes(const size_t objects);
+				void SortMortonCodes();
+				void InitTree(const SBoundingBoxesSOA& leafs);
+				void ProcessInternalNodes();
+				void ConstructBoundingBoxes();
 			};
 		}
 	}
