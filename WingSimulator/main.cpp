@@ -123,7 +123,7 @@ int main(int argc, char** argv)
 	{
 		if (argc == 1)
 		{
-			printf("Specify path to airfoil data\n");
+			std::cout << "Specify path to airfoil data" << std::endl;
 			return -1;
 		}
 		auto renderer = wing2d::rendering::opengl::CreateRenderer(argc, argv);

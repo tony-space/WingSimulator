@@ -101,6 +101,7 @@
     <CudaCompile Include="BoundingBox.cu" />
     <CudaCompile Include="CDerivativeSolver.cu" />
     <CudaCompile Include="CMortonTree.cu" />
+    <CudaCompile Include="CMortonTreeSortReduce.cu" />
     <CudaCompile Include="CSimulationCuda.cu" />
     <CudaCompile Include="LineSegment.cu" />
     <CudaCompile Include="OdeSolvers.cu" />

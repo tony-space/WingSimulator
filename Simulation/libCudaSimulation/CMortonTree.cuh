@@ -62,8 +62,7 @@ namespace wing2d
 				void GenerateMortonCodes(const size_t objects);
 				void SortMortonCodes();
 				void InitTree(const SBoundingBoxesSOA& leafs);
-				void ProcessInternalNodes();
-				void ConstructBoundingBoxes();
+				void BuildTree();
 			};
 		}
 	}

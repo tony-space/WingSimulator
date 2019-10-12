@@ -7,25 +7,155 @@
 
 using namespace wing2d::simulation::cuda;
 
-struct BoxExpander
+struct STreeInfo
 {
-	__device__ __forceinline__ float4 operator()(const float4& a, const float4& b) const
+	const size_t internalNodesCount;
+	const size_t leafNodesCount;
+	CMortonTree::STreeNode* __restrict__ internalNodes;
+	CMortonTree::STreeNode* __restrict__ leafNodes;
+	const uint32_t* const __restrict__ sortedMortonCodes;
+	const size_t* const __restrict__ sortedIndices;
+	const float4* const __restrict__ objectBoxes;
+
+	__device__ __forceinline__ ptrdiff_t Delta(size_t i, size_t j) const
+	{
+		if (j >= leafNodesCount)
+			return -1;
+
+		auto firstCode = sortedMortonCodes[i];
+		auto lastCode = sortedMortonCodes[j];
+		auto bias = ptrdiff_t(0);
+
+		if (firstCode == lastCode)
+		{
+			firstCode = i;
+			lastCode = j;
+			bias = 32;
+		}
+
+		auto commonPrefix = __clz(firstCode ^ lastCode);
+		return bias + ptrdiff_t(commonPrefix);
+	}
+
+	static __device__ __forceinline__ ptrdiff_t Sign(ptrdiff_t x)
+	{
+		if (x >= 0)
+			return 1;
+		else
+			return -1;
+	}
+
+	__device__ __forceinline__ size_t FindSplit(size_t i, size_t j) const
+	{
+		auto commonPrefix = Delta(i, j);
+		auto delta = ptrdiff_t(j) - ptrdiff_t(i);
+		auto d = Sign(delta);
+
+		auto shift = size_t(0);
+		auto step = size_t(d * delta); //always positive
+		do
+		{
+			step = (step + 1) >> 1; // exponential decrease
+			if (Delta(i, i + d * (shift + step)) > commonPrefix)
+				shift += step;
+
+		} while (step > 1);
+
+		return i + shift * d + min(d, ptrdiff_t(0));
+	}
+
+	__device__ __forceinline__ size_t FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const
+	{
+		auto lMax = size_t(2);
+		while (Delta(i, i + lMax * d) > dMin)
+			lMax *= 2;
+
+		auto shift = size_t(0);
+		auto step = lMax;
+		do
+		{
+			step = (step + 1) >> 1;
+			if (Delta(i, i + (shift + step) * d) > dMin)
+				shift += step;
+		} while (step > 1);
+
+		return i + shift * d;
+	}
+
+	__device__ __forceinline__ void ProcessInternalNode(size_t i)
+	{
+		auto d = Sign(Delta(i, i + 1) - Delta(i, i - 1));
+		auto dMin = Delta(i, i - d);
+
+		auto j = FindUpperBound(i, d, dMin);
+		auto splitPos = FindSplit(i, j);
+
+		CMortonTree::STreeNode* __restrict__ left;
+		CMortonTree::STreeNode* __restrict__ right;
+
+		if (min(i, j) == splitPos)
+		{
+			left = &leafNodes[splitPos];
+		}
+		else
+		{
+			left = &internalNodes[splitPos];
+		}
+
+		if (max(i, j) == splitPos + 1)
+		{
+			right = &leafNodes[splitPos + 1];
+		}
+		else
+		{
+			right = &internalNodes[splitPos + 1];
+		}
+
+		CMortonTree::STreeNode* __restrict__ self = &internalNodes[i];
+
+		left->parent = self;
+		right->parent = self;
+		self->left = left;
+		self->right = right;
+		self->atomicVisited = 0;
+	}
+
+	static __device__ __forceinline__ float4 ExpandBox(const float4& a, const float4& b)
 	{
 		return make_float4(fminf(a.x, b.x), fminf(a.y, b.y), fmaxf(a.z, b.z), fmaxf(a.w, b.w));
 	}
+
+	__device__ __forceinline__ void ConstructBoundingBoxes(size_t leafId)
+	{
+		auto box = objectBoxes[sortedIndices[leafId]];
+		auto leaf = &leafNodes[leafId];
+		leaf->box = box;
+
+		CMortonTree::STreeNode* cur = leaf;
+		CMortonTree::STreeNode* parent = cur->parent;
+		while (parent)
+		{
+			auto visited = atomicExch(&parent->atomicVisited, 1);
+			if (!visited)
+				return;
+
+			auto c = *cur;
+			auto p = *parent;
+
+			p.box = ExpandBox(p.box, c.box);
+
+			if (p.left && p.left != cur)
+				p.box = ExpandBox(p.box, p.left->box);
+			if (p.right && p.right != cur)
+				p.box = ExpandBox(p.box, p.right->box);
+
+			parent->box = p.box;
+
+			cur = parent;
+			parent = c.parent;
+		}
+	}
 };
-
-static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, float4* __restrict__ out)
-{
-	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= boxes.boundingBoxes)
-		return;
-
-	auto min = boxes.min[threadId];
-	auto max = boxes.max[threadId];
-
-	out[threadId] = make_float4(min.x, min.y, max.x, max.y);
-}
 
 static __device__ __forceinline__ uint32_t ExpandBy1(uint16_t val)
 {
@@ -96,11 +226,22 @@ static __global__ void InitTreeNodesPoolKernel(size_t count, CMortonTree::NodeTy
 	nodes[threadId] = result;
 }
 
-static __global__ void ProcessInternalNodesKernel(size_t internalNodesCount, CMortonTree::STreeNode* __restrict__ internalNodes, CMortonTree::STreeNode* __restrict__ leafNodes, uint32_t* const __restrict__ sortedMortonCodes)
+static __global__ void ProcessInternalNodesKernel(STreeInfo treeInfo)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= internalNodesCount)
+	if (threadId >= treeInfo.internalNodesCount)
 		return;
+
+	treeInfo.ProcessInternalNode(threadId);
+}
+
+static __global__ void ConstructBoundingBoxesKernel(STreeInfo treeInfo)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= treeInfo.leafNodesCount)
+		return;
+
+	treeInfo.ConstructBoundingBoxes(threadId);
 }
 
 //
@@ -112,11 +253,8 @@ void CMortonTree::Build(const SBoundingBoxesSOA& leafs)
 	GenerateMortonCodes(leafs.boundingBoxes);
 	SortMortonCodes();
 	InitTree(leafs);
-	ProcessInternalNodes();
-	ConstructBoundingBoxes();
+	BuildTree();
 }
-
-
 
 void CMortonTree::GenerateMortonCodes(const size_t objects)
 {
@@ -151,69 +289,29 @@ void CMortonTree::InitTree(const SBoundingBoxesSOA& leafs)
 	CudaCheckError();
 }
 
-void CMortonTree::ProcessInternalNodes()
+void CMortonTree::BuildTree()
 {
 	const auto internalCount = m_tree.internalNodesPool.size();
+	const auto leafsCount = m_tree.leafNodesPool.size();
 
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(internalCount, kBlockSize));
-	ProcessInternalNodesKernel <<<gridDim, blockDim >>> (
+	dim3 gridDim;
+
+	STreeInfo info = {
 		internalCount,
+		leafsCount,
 		m_tree.internalNodesPool.data().get(),
 		m_tree.leafNodesPool.data().get(),
-		m_mortonCodes.sortedCodes.data().get());
-	CudaCheckError();
-}
-
-void CMortonTree::ConstructBoundingBoxes()
-{
-
-}
-
-#include <cub/device/device_reduce.cuh>
-#include <cub/device/device_radix_sort.cuh>
-
-void CMortonTree::EvaluateSceneBox(const SBoundingBoxesSOA& leafs)
-{
-	m_sceneBox.transformedBoxes.resize(leafs.boundingBoxes);
-	auto boxesPtr = m_sceneBox.transformedBoxes.data().get();
-
-	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(leafs.boundingBoxes, kBlockSize));
-	TransformBoxesKernel << <gridDim, blockDim >> > (leafs, boxesPtr);
-	CudaCheckError();
-
-	size_t storageBytes = 0;
-	CudaSafeCall(cub::DeviceReduce::Reduce(nullptr, storageBytes,
-		boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), make_float4(INFINITY, INFINITY, -INFINITY, -INFINITY)));
-
-	m_sceneBox.m_cubReductionTempStorage.resize(storageBytes);
-
-	CudaSafeCall(cub::DeviceReduce::Reduce(m_sceneBox.m_cubReductionTempStorage.data().get(), storageBytes,
-		boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), make_float4(INFINITY, INFINITY, -INFINITY, -INFINITY)));
-}
-
-void CMortonTree::SortMortonCodes()
-{
-	size_t storageBytes = 0;
-
-	CudaSafeCall(cub::DeviceRadixSort::SortPairs(nullptr, storageBytes,
-		m_mortonCodes.unsortedCodes.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
-
-		m_mortonCodes.unsortedIndices.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		int(m_mortonCodes.unsortedCodes.size())
-	));
+		m_sceneBox.transformedBoxes.data().get()
+	};
 
-	m_mortonCodes.m_cubSortTempStorage.resize(storageBytes);
+	gridDim = dim3(GridSize(internalCount, kBlockSize));
+	ProcessInternalNodesKernel <<<gridDim, blockDim >>> (info);
 
-	CudaSafeCall(cub::DeviceRadixSort::SortPairs(m_mortonCodes.m_cubSortTempStorage.data().get(), storageBytes,
-		m_mortonCodes.unsortedCodes.data().get(),
-		m_mortonCodes.sortedCodes.data().get(),
+	gridDim = dim3(GridSize(leafsCount, kBlockSize));
+	ConstructBoundingBoxesKernel <<<gridDim, blockDim >>> (info);
 
-		m_mortonCodes.unsortedIndices.data().get(),
-		m_mortonCodes.sortedIndices.data().get(),
-		int(m_mortonCodes.unsortedCodes.size())
-	));
+	CudaCheckError();
 }
