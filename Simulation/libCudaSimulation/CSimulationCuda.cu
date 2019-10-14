@@ -68,6 +68,7 @@ static Segments_t BuildWalls(const SimulationState& state)
 	Segments_t result;
 
 	result.emplace_back(std::make_tuple(topRight, topLeft));
+	result.emplace_back(std::make_tuple(bottomRight, topRight));
 	result.emplace_back(std::make_tuple(bottomLeft, bottomRight));
 
 	return result;

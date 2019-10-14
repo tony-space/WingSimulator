@@ -12,8 +12,8 @@ namespace wing2d
 			struct SBoundingBoxesSOA
 			{
 				const size_t  boundingBoxes;
-				float2* const __restrict__ min;
-				float2* const __restrict__ max;
+				float2* __restrict__ min;
+				float2* __restrict__ max;
 			};
 
 			class CBoundingBoxesStorage

@@ -26,6 +26,8 @@ namespace wing2d
 			private:
 				CLineSegmentsStorage m_airfoilStorage;
 				CLineSegmentsStorage m_wallsStorage;
+
+				CBoundingBoxesStorage m_airfoilsBoxesStorage;
 				CBoundingBoxesStorage m_particlesBoxesStorage;
 
 				const size_t m_particles;
@@ -34,6 +36,7 @@ namespace wing2d
 				thrust::device_vector<float2> m_forces;
 
 				CMortonTree m_particlesTree;
+				CMortonTree m_airfoilTree;
 
 				void ResetForces();
 				void BuildParticlesTree(const OdeState_t& curState);
