@@ -38,8 +38,6 @@ namespace wing2d
 				};
 				struct SLeafNode : SAbstractNode
 				{
-					size_t id = 0;
-
 					SLeafNode() : SAbstractNode(NodeType::Leaf) {}
 				};
 				struct SInternalNode : SAbstractNode

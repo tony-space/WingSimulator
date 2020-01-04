@@ -89,12 +89,6 @@ void CMortonTree::Build(const std::vector<CBoundingBox>& leafs)
 	m_internalNodesPool.resize(internalCount);
 	m_leafNodesPool.resize(leafs.size());
 
-	std::for_each(std::execution::par_unseq, m_leafNodesPool.begin(), m_leafNodesPool.end(), [&](auto& leaf)
-	{
-		size_t idx = &leaf - m_leafNodesPool.data();
-		leaf.id = idx;
-	});
-
 	std::for_each(std::execution::par_unseq, m_internalNodesPool.cbegin(), m_internalNodesPool.cend(), [&](const auto& node)
 	{
 		size_t i = &node - m_internalNodesPool.data();
@@ -209,7 +203,8 @@ void CMortonTree::ConstructBoundingBoxes(const std::vector<CBoundingBox>& leafs)
 {
 	std::for_each(std::execution::par_unseq, m_leafNodesPool.begin(), m_leafNodesPool.end(), [&](auto& leaf)
 	{
-		const auto& leafBox = leafs[std::get<1>(m_sortedTuples[leaf.id])];
+		const auto leafId = &leaf - m_leafNodesPool.data();
+		const auto& leafBox = leafs[std::get<1>(m_sortedTuples[leafId])];
 		leaf.box.AddBox(leafBox);
 
 		SAbstractNode* cur = &leaf;
@@ -249,8 +244,9 @@ void CMortonTree::Traverse(const CBoundingBox& box, std::vector<size_t>& outColl
 
 		if (cur->type == CMortonTree::SAbstractNode::NodeType::Leaf)
 		{
-			auto leaf = static_cast<const SLeafNode*>(cur);
-			auto objectIdx = std::get<1>(m_sortedTuples[leaf->id]);
+			const auto leaf = static_cast<const SLeafNode*>(cur);
+			const auto leafId = leaf - m_leafNodesPool.data();
+			const auto objectIdx = std::get<1>(m_sortedTuples[leafId]);
 			outCollisionList.emplace_back(objectIdx);
 		}
 		else
