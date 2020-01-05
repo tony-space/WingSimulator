@@ -16,10 +16,19 @@ namespace wing2d
 	{
 		namespace cuda
 		{
-
 			class CDerivativeSolver : public IDerivativeSolver
 			{
 			public:
+				struct SIntermediateSimState
+				{
+					const size_t particles;
+					const float particleRad;
+
+					const float2* __restrict__ pos;
+					const float2* __restrict__ vel;
+					float2* __restrict__ force;
+				};
+
 				CDerivativeSolver(size_t particles, float radius, const Segments_t& airfoil, const Segments_t& walls);
 
 				virtual void Derive(const OdeState_t& curState, OdeState_t& outDerivative) override;
@@ -37,6 +46,8 @@ namespace wing2d
 
 				CMortonTree m_particlesTree;
 				CMortonTree m_airfoilTree;
+
+				SIntermediateSimState GetSimState(const OdeState_t& curState);
 
 				void ResetForces();
 				void BuildParticlesTree(const OdeState_t& curState);

@@ -15,13 +15,13 @@ static __device__ float2 SpringDamper(const float2& normal, const float2& vel1, 
 	return normal * (springLen * stiffness + v * damp) * -1.0f;
 }
 
-static __device__ float2 SpringDamper2(const float2& normal, const float2& vel1, const float2& vel2, float springLen)
-{
-	constexpr float stiffness = 50000.0f;
-	constexpr float damp = 50.0f;
-	auto v = dot(vel1 - vel2, normal);
-	return normal * (springLen * stiffness + v * damp) * -1.0f;
-}
+//static __device__ float2 SpringDamper2(const float2& normal, const float2& vel1, const float2& vel2, float springLen)
+//{
+//	constexpr float stiffness = 50000.0f;
+//	constexpr float damp = 50.0f;
+//	auto v = dot(vel1 - vel2, normal);
+//	return normal * (springLen * stiffness + v * damp) * -1.0f;
+//}
 
 static __global__ void ParticleToWallKernel(const size_t particles, const float radius, const float2* __restrict__ pOdeState, SLineSegmentsSOA walls, float2* __restrict__ outForces)
 {
@@ -85,6 +85,47 @@ static __global__ void BuildParticlesBoundingBoxesKernel(SBoundingBoxesSOA bound
 	boundingBoxes.max[threadId] = maxCorner;
 }
 
+static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree::SDeviceCollisions* __restrict__ potentialCollisions, CDerivativeSolver::SIntermediateSimState simState)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= simState.particles)
+		return;
+
+	const auto pos1 = simState.pos[threadId];
+	const auto vel1 = simState.vel[threadId];
+	const auto diameter = simState.particleRad * 2.0f;
+	const auto diameterSq = diameter * diameter;
+	auto force = make_float2(0.0f);
+
+	for (size_t collisionIdx = 0; collisionIdx < kMaxCollisionsPerElement; ++collisionIdx)
+	{
+		const auto otherParticleIdx = potentialCollisions->internalIndices[collisionIdx * simState.particles + threadId];
+		if (otherParticleIdx == threadId)
+			continue;
+		if (otherParticleIdx == size_t(-1))
+			break;
+
+		const auto pos2 = simState.pos[otherParticleIdx];
+		const auto deltaPos = pos2 - pos1;
+		const auto distanceSq = dot(deltaPos, deltaPos);
+		if (distanceSq > diameterSq || distanceSq < 1e-8f)
+			continue;
+
+		const auto vel2 = simState.vel[otherParticleIdx];
+
+		auto dist = sqrtf(distanceSq);
+		auto dir = deltaPos / dist;
+		auto springLen = diameter - dist;
+
+		force += SpringDamper(dir, vel1, vel2, springLen);
+	}
+
+	simState.force[threadId] = force;
+}
+
+//
+//
+//
 CDerivativeSolver::CDerivativeSolver(size_t particles, float radius, const Segments_t& airfoil, const Segments_t& walls) :
 	m_airfoilStorage(airfoil),
 	m_wallsStorage(walls),
@@ -113,6 +154,18 @@ void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDeriva
 	BuildDerivative(curState, outDerivative);
 }
 
+CDerivativeSolver::SIntermediateSimState CDerivativeSolver::GetSimState(const OdeState_t& curState)
+{
+	return
+	{
+		m_particles,
+		m_particleRad,
+		curState.data().get(),
+		curState.data().get() + m_particles,
+		m_forces.data().get()
+	};
+}
+
 void CDerivativeSolver::ResetForces()
 {
 	auto devPtr = m_forces.data().get();
@@ -136,6 +189,14 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 
 void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
 {
+	auto collisionsResult = m_particlesTree.Traverse(m_particlesBoxesStorage.get());
+
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_particles, kBlockSize));
+
+	ResolveParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (collisionsResult, GetSimState(curState));
+
+	CudaCheckError();
 
 }
 

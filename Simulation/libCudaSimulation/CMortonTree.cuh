@@ -25,19 +25,27 @@ namespace wing2d
 					NodeType type;
 					int atomicVisited;
 
-					float4 box;
-					STreeNode* parent;
-					STreeNode* left;
-					STreeNode* right;
+					SBoundingBox box;
+					STreeNode* __restrict__ parent;
+					STreeNode* __restrict__ left;
+					STreeNode* __restrict__ right;
+				};
+
+				struct SDeviceCollisions
+				{
+					size_t capacity;
+					size_t* __restrict__ internalIndices;
+					size_t* __restrict__ externalIndices;
 				};
 
 				void Build(const SBoundingBoxesSOA& leafs);
+				const SDeviceCollisions* Traverse(const SBoundingBoxesSOA& objects);
 			private:
 				struct
 				{
-					thrust::device_vector<float4> transformedBoxes;
-					thrust::device_ptr<float4> sceneBox = thrust::device_malloc<float4>(1);
-					thrust::device_vector<uint8_t> m_cubReductionTempStorage;
+					thrust::device_vector<SBoundingBox> transformedBoxes;
+					thrust::device_ptr<SBoundingBox> sceneBox = thrust::device_malloc<SBoundingBox>(1);
+					thrust::device_vector<uint8_t> cubReductionTempStorage;
 				} m_sceneBox;
 
 				struct
@@ -48,7 +56,7 @@ namespace wing2d
 					thrust::device_vector<uint32_t> sortedCodes;
 					thrust::device_vector<size_t> sortedIndices;
 
-					thrust::device_vector<uint8_t> m_cubSortTempStorage;
+					thrust::device_vector<uint8_t> cubSortTempStorage;
 				} m_mortonCodes;
 
 				struct
@@ -57,6 +65,13 @@ namespace wing2d
 					thrust::device_vector<STreeNode> internalNodesPool;
 					STreeNode* root = nullptr;
 				} m_tree;
+
+				struct
+				{
+					thrust::device_ptr<SDeviceCollisions> traverseResult = thrust::device_malloc<SDeviceCollisions>(1);
+					thrust::device_vector<size_t> internalIndices;
+					thrust::device_vector<size_t> externalIndices;
+				} m_collisions;
 
 				void EvaluateSceneBox(const SBoundingBoxesSOA& leafs);
 				void GenerateMortonCodes(const size_t objects);

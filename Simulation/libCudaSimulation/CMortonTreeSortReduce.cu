@@ -6,15 +6,16 @@
 
 using namespace wing2d::simulation::cuda;
 
+//You cannot just pass a pointer to a device function to CUB library, because you'll get cudaErrorInvalidPc error.
 struct BoxExpander
 {
-	__device__ __forceinline__ float4 operator()(const float4& a, const float4& b) const
+	__device__ SBoundingBox operator()(const SBoundingBox& a, const SBoundingBox& b) const
 	{
-		return make_float4(fminf(a.x, b.x), fminf(a.y, b.y), fmaxf(a.z, b.z), fmaxf(a.w, b.w));
+		return SBoundingBox::ExpandBox(a, b);
 	}
 };
 
-static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, float4* __restrict__ out)
+static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, SBoundingBox* __restrict__ out)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= boxes.boundingBoxes)
@@ -23,7 +24,7 @@ static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, float
 	auto min = boxes.min[threadId];
 	auto max = boxes.max[threadId];
 
-	out[threadId] = make_float4(min.x, min.y, max.x, max.y);
+	out[threadId] = {min, max};
 }
 
 void CMortonTree::EvaluateSceneBox(const SBoundingBoxesSOA& leafs)
@@ -38,12 +39,12 @@ void CMortonTree::EvaluateSceneBox(const SBoundingBoxesSOA& leafs)
 
 	size_t storageBytes = 0;
 	CudaSafeCall(cub::DeviceReduce::Reduce(nullptr, storageBytes,
-				 boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), make_float4(INFINITY, INFINITY, -INFINITY, -INFINITY)));
+				 boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), SBoundingBox()));
 
-	m_sceneBox.m_cubReductionTempStorage.resize(storageBytes);
+	m_sceneBox.cubReductionTempStorage.resize(storageBytes);
 
-	CudaSafeCall(cub::DeviceReduce::Reduce(m_sceneBox.m_cubReductionTempStorage.data().get(), storageBytes,
-				 boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), make_float4(INFINITY, INFINITY, -INFINITY, -INFINITY)));
+	CudaSafeCall(cub::DeviceReduce::Reduce(m_sceneBox.cubReductionTempStorage.data().get(), storageBytes,
+				 boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), SBoundingBox()));
 }
 
 void CMortonTree::SortMortonCodes()
@@ -59,9 +60,9 @@ void CMortonTree::SortMortonCodes()
 				 int(m_mortonCodes.unsortedCodes.size())
 	));
 
-	m_mortonCodes.m_cubSortTempStorage.resize(storageBytes);
+	m_mortonCodes.cubSortTempStorage.resize(storageBytes);
 
-	CudaSafeCall(cub::DeviceRadixSort::SortPairs(m_mortonCodes.m_cubSortTempStorage.data().get(), storageBytes,
+	CudaSafeCall(cub::DeviceRadixSort::SortPairs(m_mortonCodes.cubSortTempStorage.data().get(), storageBytes,
 				 m_mortonCodes.unsortedCodes.data().get(),
 				 m_mortonCodes.sortedCodes.data().get(),
 
