@@ -38,6 +38,7 @@ namespace wing2d
 
 				CBoundingBoxesStorage m_airfoilsBoxesStorage;
 				CBoundingBoxesStorage m_particlesBoxesStorage;
+				CBoundingBoxesStorage m_particlesExtendedBoxesStorage;
 
 				const size_t m_particles;
 				const float m_particleRad;

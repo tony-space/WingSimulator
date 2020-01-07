@@ -171,7 +171,7 @@ struct STreeInfo
 				{
 					const auto leafId = cur - leafNodes;
 					const auto leafIdx = sortedIndices[leafId];
-					if (collisionIdx >= kMaxCollisionsPerElement)
+					if (collisionIdx >= collisions.maxCollisionsPerElement)
 						return;
 
 					const auto outputIdx = collisionIdx * externalObjects.boundingBoxes + externalIdx;
@@ -189,7 +189,7 @@ struct STreeInfo
 			}
 		}
 
-		if (collisionIdx < kMaxCollisionsPerElement)
+		if (collisionIdx < collisions.maxCollisionsPerElement)
 		{
 			const auto outputIdx = collisionIdx * externalObjects.boundingBoxes + externalIdx;
 			collisions.internalIndices[outputIdx] = size_t(-1);
@@ -361,7 +361,7 @@ void CMortonTree::BuildTree()
 	CudaCheckError();
 }
 
-const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesSOA& objects)
+const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesSOA& objects, size_t maxCollisionsPerElement)
 {
 	const auto externalCount = objects.boundingBoxes;
 	dim3 blockDim(kBlockSize);
@@ -378,12 +378,13 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesS
 		m_sceneBox.transformedBoxes.data().get()
 	};
 
-	const auto capactity = externalCount * kMaxCollisionsPerElement;
+	const auto capactity = externalCount * maxCollisionsPerElement;
 	m_collisions.internalIndices.resize(capactity);
 
 	SDeviceCollisions collisions =
 	{
-		capactity,
+		externalCount,
+		maxCollisionsPerElement,
 		m_collisions.internalIndices.data().get()
 	};
 

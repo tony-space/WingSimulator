@@ -15,13 +15,13 @@ static __device__ float2 SpringDamper(const float2& normal, const float2& vel1, 
 	return normal * (springLen * stiffness + v * damp) * -1.0f;
 }
 
-//static __device__ float2 SpringDamper2(const float2& normal, const float2& vel1, const float2& vel2, float springLen)
-//{
-//	constexpr float stiffness = 50000.0f;
-//	constexpr float damp = 50.0f;
-//	auto v = dot(vel1 - vel2, normal);
-//	return normal * (springLen * stiffness + v * damp) * -1.0f;
-//}
+static __device__ float2 SpringDamper2(const float2& normal, const float2& vel1, const float2& vel2, float springLen)
+{
+	constexpr float stiffness = 50000.0f;
+	constexpr float damp = 50.0f;
+	auto v = dot(vel1 - vel2, normal);
+	return normal * (springLen * stiffness + v * damp) * -1.0f;
+}
 
 static __global__ void ParticleToWallKernel(const size_t particles, const float radius, const float2* __restrict__ pOdeState, SLineSegmentsSOA walls, float2* __restrict__ outForces)
 {
@@ -61,11 +61,11 @@ static __global__ void BuildAirfoilBoxesKernel(SLineSegmentsSOA airfoil, SBoundi
 	if (threadId >= airfoil.lineSegments)
 		return;
 
-	auto f = airfoil.first[threadId];
-	auto s = airfoil.second[threadId];
+	const auto f = airfoil.first[threadId];
+	const auto s = airfoil.second[threadId];
 
-	auto minCorner = make_float2(fminf(f.x, s.x), fminf(f.y, s.y));
-	auto maxCorner = make_float2(fmaxf(f.x, s.x), fmaxf(f.y, s.y));
+	const auto minCorner = fminf(f, s);
+	const auto maxCorner = fmaxf(f, s);
 
 	boxes.min[threadId] = minCorner;
 	boxes.max[threadId] = maxCorner;
@@ -97,9 +97,9 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 	const auto diameterSq = diameter * diameter;
 	auto force = make_float2(0.0f);
 
-	for (size_t collisionIdx = 0; collisionIdx < kMaxCollisionsPerElement; ++collisionIdx)
+	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
-		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * simState.particles + threadId];
+		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.externalElememnts + threadId];
 		if (otherParticleIdx == threadId)
 			continue;
 		if (otherParticleIdx == size_t(-1))
@@ -123,6 +123,85 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 	simState.force[threadId] = force;
 }
 
+static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState, SLineSegmentsSOA airfoil)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= simState.particles)
+		return;
+
+	const auto pos = simState.pos[threadId];
+	struct SSegment
+	{
+		float2 first;
+		float2 ray;
+		float2 normal;
+
+		float length = 0.0f;
+		float distanceTo = INFINITY;
+	} closest;
+
+	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
+	{
+		const auto wingSegmentIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.externalElememnts + threadId];
+		if (wingSegmentIdx == size_t(-1))
+			break;
+
+		SSegment cur =
+		{
+			airfoil.first[wingSegmentIdx],
+			airfoil.ray[wingSegmentIdx],
+			airfoil.normal[wingSegmentIdx],
+			airfoil.length[wingSegmentIdx],
+			INFINITY
+		};
+
+		const auto projection = dot(cur.ray, pos - cur.first);
+
+		float2 closestPoint;
+		if (projection < 0.0f)
+		{
+			closestPoint = cur.first;
+		}
+		else if (projection >= 0.0f && projection <= cur.length)
+		{
+			closestPoint = cur.first + cur.ray * projection;
+		}
+		else
+		{
+			closestPoint = cur.first + cur.ray * cur.length;
+		}
+
+		cur.distanceTo = length(pos - closestPoint);
+		
+		if (cur.distanceTo < closest.distanceTo)
+		{
+			closest = cur;
+		}
+		else if (cur.distanceTo == closest.distanceTo)
+		{
+			auto delta1 = pos - closest.first;
+			auto delta2 = pos - cur.first;
+
+			auto dot1 = dot(delta1, closest.normal);
+			auto dot2 = dot(delta2, cur.normal);
+
+			if (dot2 > dot1)
+				closest = cur;
+		}
+	}
+
+	if (closest.distanceTo == INFINITY)
+		return;
+
+	const auto height = dot(closest.normal, pos - closest.first);
+
+	if (height <= simState.particleRad)
+	{
+		const auto penetration = height - simState.particleRad;
+		simState.force[threadId] += SpringDamper2(closest.normal, simState.vel[threadId], make_float2(0.0f), penetration);
+	}
+}
+
 //
 //
 //
@@ -131,6 +210,7 @@ CDerivativeSolver::CDerivativeSolver(size_t particles, float radius, const Segme
 	m_wallsStorage(walls),
 	m_airfoilsBoxesStorage(airfoil.size()),
 	m_particlesBoxesStorage(particles),
+	m_particlesExtendedBoxesStorage(particles),
 	m_forces(particles),
 	m_particles(particles),
 	m_particleRad(radius)
@@ -182,6 +262,7 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 	auto boxesStorage = m_particlesBoxesStorage.get();
 
 	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>>(boxesStorage, m_particleRad, curState.data().get());
+	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>>(m_particlesExtendedBoxesStorage.get(), m_particleRad * 4.0f, curState.data().get());
 	CudaCheckError();
 
 	m_particlesTree.Build(boxesStorage);
@@ -202,7 +283,15 @@ void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curS
 
 void CDerivativeSolver::ResolveParticleWingCollisions(const OdeState_t& curState)
 {
+	const auto collisionsResult = m_airfoilTree.Traverse(m_particlesExtendedBoxesStorage.get());
 
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_particles, kBlockSize));
+
+	auto simState = GetSimState(curState);
+	ResolveParticleWingCollisionsKernel <<<gridDim, blockDim >>> (collisionsResult, simState, m_airfoilStorage.get());
+
+	CudaCheckError();
 }
 
 void CDerivativeSolver::ParticleToWall(const OdeState_t& curState)

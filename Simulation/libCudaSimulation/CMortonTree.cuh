@@ -33,12 +33,13 @@ namespace wing2d
 
 				struct SDeviceCollisions
 				{
-					size_t capacity;
+					const size_t externalElememnts;
+					const size_t maxCollisionsPerElement;
 					size_t* __restrict__ internalIndices;
 				};
 
 				void Build(const SBoundingBoxesSOA& leafs);
-				const SDeviceCollisions Traverse(const SBoundingBoxesSOA& objects);
+				const SDeviceCollisions Traverse(const SBoundingBoxesSOA& objects, size_t maxCollisionsPerElement = 32);
 			private:
 				struct
 				{

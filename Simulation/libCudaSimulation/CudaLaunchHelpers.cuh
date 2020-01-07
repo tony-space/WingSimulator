@@ -13,7 +13,6 @@ namespace wing2d
 		namespace cuda
 		{
 			constexpr unsigned kBlockSize = 64;
-			constexpr size_t kMaxCollisionsPerElement = 1024;
 			
 			inline unsigned GridSize(size_t elements, unsigned blockSize)
 			{
