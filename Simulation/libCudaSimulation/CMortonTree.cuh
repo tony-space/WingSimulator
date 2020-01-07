@@ -35,11 +35,10 @@ namespace wing2d
 				{
 					size_t capacity;
 					size_t* __restrict__ internalIndices;
-					size_t* __restrict__ externalIndices;
 				};
 
 				void Build(const SBoundingBoxesSOA& leafs);
-				const SDeviceCollisions* Traverse(const SBoundingBoxesSOA& objects);
+				const SDeviceCollisions Traverse(const SBoundingBoxesSOA& objects);
 			private:
 				struct
 				{
@@ -68,9 +67,7 @@ namespace wing2d
 
 				struct
 				{
-					thrust::device_ptr<SDeviceCollisions> traverseResult = thrust::device_malloc<SDeviceCollisions>(1);
 					thrust::device_vector<size_t> internalIndices;
-					thrust::device_vector<size_t> externalIndices;
 				} m_collisions;
 
 				void EvaluateSceneBox(const SBoundingBoxesSOA& leafs);

@@ -85,7 +85,7 @@ static __global__ void BuildParticlesBoundingBoxesKernel(SBoundingBoxesSOA bound
 	boundingBoxes.max[threadId] = maxCorner;
 }
 
-static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree::SDeviceCollisions* __restrict__ potentialCollisions, CDerivativeSolver::SIntermediateSimState simState)
+static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= simState.particles)
@@ -99,7 +99,7 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 
 	for (size_t collisionIdx = 0; collisionIdx < kMaxCollisionsPerElement; ++collisionIdx)
 	{
-		const auto otherParticleIdx = potentialCollisions->internalIndices[collisionIdx * simState.particles + threadId];
+		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * simState.particles + threadId];
 		if (otherParticleIdx == threadId)
 			continue;
 		if (otherParticleIdx == size_t(-1))
@@ -189,7 +189,7 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 
 void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
 {
-	auto collisionsResult = m_particlesTree.Traverse(m_particlesBoxesStorage.get());
+	const auto collisionsResult = m_particlesTree.Traverse(m_particlesBoxesStorage.get());
 
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(m_particles, kBlockSize));
