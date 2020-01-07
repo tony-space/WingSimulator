@@ -123,7 +123,7 @@ struct STreeInfo
 
 	__device__ void ConstructBoundingBoxes(size_t leafId)
 	{
-		auto box = objectBoxes[sortedIndices[leafId]];
+		auto box = objectBoxes[leafId];
 		auto leaf = &leafNodes[leafId];
 		leaf->box = box;
 
@@ -152,7 +152,7 @@ struct STreeInfo
 		}
 	}
 
-	__device__ void Traverse(const SBoundingBox& box, size_t* sharedMem, size_t maxCollisionsPerElement) const
+	__device__ void Traverse(const SBoundingBox& box, size_t* sharedMem, size_t maxCollisionsPerElement, size_t reflexiveIdx = size_t(-1)) const
 	{
 		constexpr size_t kMaxStackSize = 64;
 		CMortonTree::STreeNode* stack[kMaxStackSize];
@@ -174,11 +174,15 @@ struct STreeInfo
 				if (cur.type == CMortonTree::NodeType::Leaf)
 				{
 					const auto leafIdx = curPtr - leafNodes;
-					if (collisionIdx >= maxCollisionsPerElement)
-						return;
+
+					if (leafIdx == reflexiveIdx)
+						continue;
 
 					sharedMem[blockDim.x * collisionIdx + threadIdx.x] = leafIdx;
 					collisionIdx++;
+
+					if (collisionIdx >= maxCollisionsPerElement)
+						return;
 				}
 				else
 				{
@@ -297,7 +301,33 @@ static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBound
 		if (leafIdx != size_t(-1))
 			objectIdx = treeInfo.sortedIndices[leafIdx];
 
-		outResult.internalIndices[outResult.externalElements * i + threadId] = objectIdx;
+		outResult.internalIndices[outResult.elements * i + threadId] = objectIdx;
+		if (objectIdx == size_t(-1))
+			break;
+	}
+}
+
+static __global__ void TraverseTreeReflexiveKernel(const STreeInfo treeInfo, CMortonTree::SDeviceCollisions outResult)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= treeInfo.leafNodesCount)
+		return;
+
+	extern __shared__ size_t collisions[];
+
+	auto trueIdx = treeInfo.sortedIndices[threadId];
+	auto box = treeInfo.objectBoxes[threadId];
+	treeInfo.Traverse(box, collisions, outResult.maxCollisionsPerElement, threadId);
+
+	for (size_t i = 0; i < outResult.maxCollisionsPerElement; ++i)
+	{
+		const auto leafIdx = collisions[blockDim.x * i + threadIdx.x];
+
+		auto objectIdx = size_t(-1);
+		if (leafIdx != size_t(-1))
+			objectIdx = treeInfo.sortedIndices[leafIdx];
+
+		outResult.internalIndices[outResult.elements * i + trueIdx] = objectIdx;
 		if (objectIdx == size_t(-1))
 			break;
 	}
@@ -361,7 +391,7 @@ void CMortonTree::BuildTree()
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		m_sceneBox.transformedBoxes.data().get()
+		m_sceneBox.sortedBoxes.data().get()
 	};
 
 	gridDim = dim3(GridSize(info.internalNodesCount, kBlockSize));
@@ -387,7 +417,7 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesS
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		m_sceneBox.transformedBoxes.data().get()
+		m_sceneBox.sortedBoxes.data().get()
 	};
 
 	const auto capactity = externalCount * maxCollisionsPerElement;
@@ -401,6 +431,40 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesS
 	};
 
 	TraverseTreeKernel <<<gridDim, blockDim, sizeof(size_t) * blockDim.x * maxCollisionsPerElement>>> (info, objects, collisions);
+
+	CudaCheckError();
+
+	return collisions;
+}
+
+const CMortonTree::SDeviceCollisions CMortonTree::TraverseReflexive(size_t maxCollisionsPerElement)
+{
+	const auto count = m_tree.leafNodesPool.size();
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(count, kBlockSize));
+
+	STreeInfo info = {
+		m_tree.internalNodesPool.size(),
+		m_tree.leafNodesPool.size(),
+		m_tree.root,
+		m_tree.internalNodesPool.data().get(),
+		m_tree.leafNodesPool.data().get(),
+		m_mortonCodes.sortedCodes.data().get(),
+		m_mortonCodes.sortedIndices.data().get(),
+		m_sceneBox.sortedBoxes.data().get()
+	};
+
+	const auto capactity = count * maxCollisionsPerElement;
+	m_collisions.internalIndices.resize(capactity);
+
+	SDeviceCollisions collisions =
+	{
+		count,
+		maxCollisionsPerElement,
+		m_collisions.internalIndices.data().get()
+	};
+
+	TraverseTreeReflexiveKernel <<<gridDim, blockDim, sizeof(size_t)* blockDim.x * maxCollisionsPerElement >>> (info, collisions);
 
 	CudaCheckError();
 

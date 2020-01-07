@@ -99,7 +99,7 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 
 	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
-		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.externalElements + threadId];
+		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.elements + threadId];
 		if (otherParticleIdx == threadId)
 			continue;
 		if (otherParticleIdx == size_t(-1))
@@ -142,7 +142,7 @@ static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SD
 
 	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
-		const auto wingSegmentIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.externalElements + threadId];
+		const auto wingSegmentIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.elements + threadId];
 		if (wingSegmentIdx == size_t(-1))
 			break;
 
@@ -270,7 +270,7 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 
 void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
 {
-	const auto collisionsResult = m_particlesTree.Traverse(m_particlesBoxesStorage.get());
+	const auto collisionsResult = m_particlesTree.TraverseReflexive();
 
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(m_particles, kBlockSize));

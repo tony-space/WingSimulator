@@ -27,9 +27,19 @@ static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, SBoun
 	out[threadId] = {min, max};
 }
 
+static __global__ void OrderBoundingBoxesKernel(const SBoundingBox* __restrict__ unordered, size_t* sortedIndices, size_t count, SBoundingBox* __restrict__ ordered)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= count)
+		return;
+
+	ordered[threadId] = unordered[sortedIndices[threadId]];
+}
+
 void CMortonTree::EvaluateSceneBox(const SBoundingBoxesSOA& leafs)
 {
 	m_sceneBox.transformedBoxes.resize(leafs.boundingBoxes);
+	m_sceneBox.sortedBoxes.resize(leafs.boundingBoxes);
 	auto boxesPtr = m_sceneBox.transformedBoxes.data().get();
 
 	dim3 blockDim(kBlockSize);
@@ -70,4 +80,15 @@ void CMortonTree::SortMortonCodes()
 				 m_mortonCodes.sortedIndices.data().get(),
 				 int(m_mortonCodes.unsortedCodes.size())
 	));
+
+
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_sceneBox.transformedBoxes.size(), kBlockSize));
+	OrderBoundingBoxesKernel <<<gridDim, blockDim >>> (
+		m_sceneBox.transformedBoxes.data().get(),
+		m_mortonCodes.sortedIndices.data().get(),
+		m_sceneBox.transformedBoxes.size(),
+		m_sceneBox.sortedBoxes.data().get());
+	CudaCheckError();
+
 }

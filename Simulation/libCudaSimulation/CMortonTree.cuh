@@ -33,17 +33,19 @@ namespace wing2d
 
 				struct SDeviceCollisions
 				{
-					const size_t externalElements;
+					const size_t elements;
 					const size_t maxCollisionsPerElement;
 					size_t* __restrict__ internalIndices;
 				};
 
 				void Build(const SBoundingBoxesSOA& leafs);
 				const SDeviceCollisions Traverse(const SBoundingBoxesSOA& objects, size_t maxCollisionsPerElement = 32);
+				const SDeviceCollisions TraverseReflexive(size_t maxCollisionsPerElement = 32);
 			private:
 				struct
 				{
 					thrust::device_vector<SBoundingBox> transformedBoxes;
+					thrust::device_vector<SBoundingBox> sortedBoxes;
 					thrust::device_ptr<SBoundingBox> sceneBox = thrust::device_malloc<SBoundingBox>(1);
 					thrust::device_vector<uint8_t> cubReductionTempStorage;
 				} m_sceneBox;
