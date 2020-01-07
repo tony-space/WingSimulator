@@ -33,7 +33,7 @@ namespace wing2d
 
 				struct SDeviceCollisions
 				{
-					const size_t externalElememnts;
+					const size_t externalElements;
 					const size_t maxCollisionsPerElement;
 					size_t* __restrict__ internalIndices;
 				};

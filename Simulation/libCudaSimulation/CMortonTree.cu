@@ -152,14 +152,16 @@ struct STreeInfo
 		}
 	}
 
-	__device__ void Traverse(const SBoundingBoxesSOA& externalObjects, size_t externalIdx, CMortonTree::SDeviceCollisions& collisions) const
+	__device__ void Traverse(SBoundingBox box, size_t* sharedMem, size_t maxCollisionsPerElement) const
 	{
 		constexpr size_t kMaxStackSize = 64;
 		CMortonTree::STreeNode* stack[kMaxStackSize];
 		unsigned top = 0;
 		stack[top] = root;
 
-		auto box = SBoundingBox(externalObjects.min[externalIdx], externalObjects.max[externalIdx]);
+		for (size_t i = 0; i < maxCollisionsPerElement; ++i)
+			sharedMem[blockDim.x * i + threadIdx.x] = size_t(-1);
+
 		auto collisionIdx = 0;
 
 		while (top < kMaxStackSize) //top == -1 also covered
@@ -171,11 +173,10 @@ struct STreeInfo
 				{
 					const auto leafId = cur - leafNodes;
 					const auto leafIdx = sortedIndices[leafId];
-					if (collisionIdx >= collisions.maxCollisionsPerElement)
+					if (collisionIdx >= maxCollisionsPerElement)
 						return;
 
-					const auto outputIdx = collisionIdx * externalObjects.boundingBoxes + externalIdx;
-					collisions.internalIndices[outputIdx] = leafIdx;
+					sharedMem[blockDim.x * collisionIdx + threadIdx.x] = leafIdx;
 					collisionIdx++;
 				}
 				else
@@ -187,12 +188,6 @@ struct STreeInfo
 					}
 				}
 			}
-		}
-
-		if (collisionIdx < collisions.maxCollisionsPerElement)
-		{
-			const auto outputIdx = collisionIdx * externalObjects.boundingBoxes + externalIdx;
-			collisions.internalIndices[outputIdx] = size_t(-1);
 		}
 	}
 };
@@ -288,7 +283,18 @@ static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBound
 	if (threadId >= externalObjects.boundingBoxes)
 		return;
 
-	treeInfo.Traverse(externalObjects, threadId, outResult);
+	extern __shared__ size_t collisions[];
+
+	auto box = SBoundingBox(externalObjects.min[threadId], externalObjects.max[threadId]);
+	treeInfo.Traverse(box, collisions, outResult.maxCollisionsPerElement);
+
+	for (size_t i = 0; i < outResult.maxCollisionsPerElement; ++i)
+	{
+		auto leafIdx = collisions[blockDim.x * i + threadIdx.x];
+		outResult.internalIndices[outResult.externalElements * i + threadId] = leafIdx;
+		if (leafIdx == size_t(-1))
+			break;
+	}
 }
 
 //
@@ -388,7 +394,7 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesS
 		m_collisions.internalIndices.data().get()
 	};
 
-	TraverseTreeKernel <<<gridDim, blockDim>>> (info, objects, collisions);
+	TraverseTreeKernel <<<gridDim, blockDim, sizeof(size_t) * blockDim.x * maxCollisionsPerElement>>> (info, objects, collisions);
 
 	CudaCheckError();
 
