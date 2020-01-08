@@ -95,7 +95,8 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 	const auto vel1 = simState.vel[threadId];
 	const auto diameter = simState.particleRad * 2.0f;
 	const auto diameterSq = diameter * diameter;
-	auto force = make_float2(0.0f);
+	auto totalForce = make_float2(0.0f);
+	auto totalPressure = 0.0f;
 
 	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
@@ -117,10 +118,13 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 		auto dir = deltaPos / dist;
 		auto springLen = diameter - dist;
 
-		force += SpringDamper(dir, vel1, vel2, springLen);
+		auto force = SpringDamper(dir, vel1, vel2, springLen);
+		totalForce += force;
+		totalPressure += length(force);
 	}
 
-	simState.force[threadId] = force;
+	simState.force[threadId] += totalForce;
+	simState.pressure[threadId] += totalPressure;
 }
 
 static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState, SLineSegmentsSOA airfoil)
@@ -198,7 +202,10 @@ static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SD
 	if (height <= simState.particleRad)
 	{
 		const auto penetration = height - simState.particleRad;
-		simState.force[threadId] += SpringDamper2(closest.normal, simState.vel[threadId], make_float2(0.0f), penetration);
+		auto force = SpringDamper2(closest.normal, simState.vel[threadId], make_float2(0.0f), penetration);
+		auto pressure = length(force);
+		simState.force[threadId] += force;
+		simState.pressure[threadId] += pressure;
 	}
 }
 
@@ -212,6 +219,7 @@ CDerivativeSolver::CDerivativeSolver(size_t particles, float radius, const Segme
 	m_particlesBoxesStorage(particles),
 	m_particlesExtendedBoxesStorage(particles),
 	m_forces(particles),
+	m_pressures(particles),
 	m_particles(particles),
 	m_particleRad(radius)
 {
@@ -242,15 +250,15 @@ CDerivativeSolver::SIntermediateSimState CDerivativeSolver::GetSimState(const Od
 		m_particleRad,
 		curState.data().get(),
 		curState.data().get() + m_particles,
-		m_forces.data().get()
+		m_forces.data().get(),
+		m_pressures.data().get()
 	};
 }
 
 void CDerivativeSolver::ResetForces()
 {
-	auto devPtr = m_forces.data().get();
-	auto bytesSize = m_particles * sizeof(decltype(m_forces)::value_type);
-	CudaSafeCall(cudaMemsetAsync(devPtr, 0, bytesSize));
+	CudaSafeCall(cudaMemsetAsync(m_forces.data().get(), 0, m_particles * sizeof(float2)));
+	CudaSafeCall(cudaMemsetAsync(m_pressures.data().get(), 0, m_particles * sizeof(float)));
 }
 
 void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
@@ -270,7 +278,7 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 
 void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
 {
-	const auto collisionsResult = m_particlesTree.TraverseReflexive();
+	const auto collisionsResult = m_particlesTree.TraverseReflexive(128);
 
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(m_particles, kBlockSize));
@@ -324,4 +332,9 @@ void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& 
 
 	CudaSafeCall(cudaMemcpyAsync(d_derivative, d_velocities, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice));
 	CudaSafeCall(cudaMemcpyAsync(d_derivative + m_particles, d_forces, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice));
+}
+
+const thrust::device_vector<float>& CDerivativeSolver::GetPressures() const
+{
+	return m_pressures;
 }

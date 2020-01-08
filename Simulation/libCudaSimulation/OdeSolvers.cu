@@ -19,12 +19,10 @@ static __global__ void SaxpyKernel(const float* __restrict__ pDt, const size_t n
 	nextState[threadId] = state[threadId] + derivative[threadId] * dt;
 }
 
-CForwardEulerSolver::CForwardEulerSolver(std::unique_ptr<IDerivativeSolver>&& derivativeSolver)
+CForwardEulerSolver::CForwardEulerSolver(IDerivativeSolver* derivativeSolver) : m_derivativeSolver(derivativeSolver)
 {
 	if (!derivativeSolver)
 		throw std::runtime_error("derivativeSolver is empty");
-
-	m_derivativeSolver = std::move(derivativeSolver);
 }
 
 void CForwardEulerSolver::NextState(const thrust::device_ptr<float>& dt, const OdeState_t& curState, OdeState_t& outNextState)

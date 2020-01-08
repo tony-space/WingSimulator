@@ -440,8 +440,8 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesS
 const CMortonTree::SDeviceCollisions CMortonTree::TraverseReflexive(size_t maxCollisionsPerElement)
 {
 	const auto count = m_tree.leafNodesPool.size();
-	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(count, kBlockSize));
+	dim3 blockDim(32);
+	dim3 gridDim(GridSize(count, blockDim.x));
 
 	STreeInfo info = {
 		m_tree.internalNodesPool.size(),

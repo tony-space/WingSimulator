@@ -8,7 +8,6 @@
 #include "CSimulationCuda.cuh"
 
 #include "OdeSolvers.cuh"
-#include "CDerivativeSolver.cuh"
 #include "CudaLaunchHelpers.cuh"
 
 
@@ -38,6 +37,15 @@ static __global__ void ColorParticlesKernel(const float* __restrict__ pDt, const
 
 	auto force = (nextVel[threadId] - lastVel[threadId]) / *pDt;
 	color[threadId] = GetHeatMapColor(logf(length(force) + 1.0f) / 10.0f + 0.15f);
+}
+
+static __global__ void ColorParticlesKernel2(const size_t nParticles, const float* __restrict__ pressures, float4* __restrict__ color)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= nParticles)
+		return;
+
+	color[threadId] = GetHeatMapColor(logf(pressures[threadId] + 1.0f) / 10.0f + 0.15f);
 }
 
 
@@ -99,15 +107,15 @@ void CSimulationCuda::ResetState(const SimulationState& state)
 
 	CopyToGPU();
 
-	auto derivativeSolver = std::make_unique<CDerivativeSolver>(m_state.particles, m_state.particleRad, BuildAirfoil(m_state), BuildWalls(m_state));
-	m_odeSolver = std::make_unique<CForwardEulerSolver>(std::move(derivativeSolver));
+	m_derivativeSolver = std::make_unique<CDerivativeSolver>(m_state.particles, m_state.particleRad, BuildAirfoil(m_state), BuildWalls(m_state));
+	m_odeSolver = std::make_unique<CForwardEulerSolver>(m_derivativeSolver.get());
 }
 
 float CSimulationCuda::Update(float dt)
 {
 	m_odeSolver->NextState(ComputeMinDeltaTime(dt), m_curOdeState, m_nextOdeState);
 	
-	ColorParticles();
+	ColorParticles2();
 
 	m_nextOdeState.swap(m_curOdeState);
 
@@ -129,6 +137,22 @@ void CSimulationCuda::ColorParticles()
 	m_hostColors = m_deviceColors;
 	std::transform(m_hostColors.cbegin(), m_hostColors.cend(), m_state.color.begin(), VecToTuple4D);
 }
+
+void CSimulationCuda::ColorParticles2()
+{
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_state.particles, kBlockSize));
+
+	auto pressures = m_derivativeSolver->GetPressures().data().get();
+	auto resultColors = m_deviceColors.data().get();
+
+	ColorParticlesKernel2 <<<gridDim, blockDim >>> (m_state.particles, pressures, resultColors);
+	CudaCheckError();
+
+	m_hostColors = m_deviceColors;
+	std::transform(m_hostColors.cbegin(), m_hostColors.cend(), m_state.color.begin(), VecToTuple4D);
+}
+
 
 const SimulationState& CSimulationCuda::GetState()
 {
