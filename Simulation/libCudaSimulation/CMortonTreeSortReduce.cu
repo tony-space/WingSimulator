@@ -1,6 +1,7 @@
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_radix_sort.cuh>
 
+#include "CudaInterfaces.cuh"
 #include "CudaLaunchHelpers.cuh"
 #include "CMortonTree.cuh"
 
@@ -27,7 +28,7 @@ static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, SBoun
 	out[threadId] = {min, max};
 }
 
-static __global__ void OrderBoundingBoxesKernel(const SBoundingBox* __restrict__ unordered, size_t* sortedIndices, size_t count, SBoundingBox* __restrict__ ordered)
+static __global__ void OrderBoundingBoxesKernel(const SBoundingBox* __restrict__ unordered, TIndex* sortedIndices, size_t count, SBoundingBox* __restrict__ ordered)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= count)

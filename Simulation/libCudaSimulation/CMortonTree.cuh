@@ -4,6 +4,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/device_malloc.h>
 
+#include "CudaInterfaces.cuh"
 #include "BoundingBox.cuh"
 
 namespace wing2d
@@ -35,7 +36,7 @@ namespace wing2d
 				{
 					const size_t elements;
 					const size_t maxCollisionsPerElement;
-					size_t* __restrict__ internalIndices;
+					TIndex* __restrict__ internalIndices;
 				};
 
 				void Build(const SBoundingBoxesSOA& leafs);
@@ -53,10 +54,10 @@ namespace wing2d
 				struct
 				{
 					thrust::device_vector<uint32_t> unsortedCodes;
-					thrust::device_vector<size_t> unsortedIndices;
+					thrust::device_vector<TIndex> unsortedIndices;
 
 					thrust::device_vector<uint32_t> sortedCodes;
-					thrust::device_vector<size_t> sortedIndices;
+					thrust::device_vector<TIndex> sortedIndices;
 
 					thrust::device_vector<uint8_t> cubSortTempStorage;
 				} m_mortonCodes;
@@ -68,10 +69,7 @@ namespace wing2d
 					STreeNode* root = nullptr;
 				} m_tree;
 
-				struct
-				{
-					thrust::device_vector<size_t> internalIndices;
-				} m_collisions;
+				thrust::device_vector<TIndex> m_collisionIndices;
 
 				void EvaluateSceneBox(const SBoundingBoxesSOA& leafs);
 				void GenerateMortonCodes(const size_t objects);

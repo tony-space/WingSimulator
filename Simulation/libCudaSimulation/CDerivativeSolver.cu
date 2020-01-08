@@ -103,7 +103,7 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.elements + threadId];
 		if (otherParticleIdx == threadId)
 			continue;
-		if (otherParticleIdx == size_t(-1))
+		if (otherParticleIdx == TIndex(-1))
 			break;
 
 		const auto pos2 = simState.pos[otherParticleIdx];
@@ -147,7 +147,7 @@ static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SD
 	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
 		const auto wingSegmentIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.elements + threadId];
-		if (wingSegmentIdx == size_t(-1))
+		if (wingSegmentIdx == TIndex(-1))
 			break;
 
 		SSegment cur =

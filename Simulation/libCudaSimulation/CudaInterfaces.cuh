@@ -21,6 +21,8 @@ namespace wing2d
 			typedef std::tuple<float2, float2> LineSegment_t;
 			typedef std::vector<LineSegment_t> Segments_t;
 
+			typedef uint32_t TIndex;
+
 			struct IDerivativeSolver
 			{
 				virtual void Derive(const OdeState_t& curState, OdeState_t& outDerivative) = 0;
