@@ -103,6 +103,7 @@
     <CudaCompile Include="CMortonTree.cu" />
     <CudaCompile Include="CMortonTreeSortReduce.cu" />
     <CudaCompile Include="CSimulationCuda.cu" />
+    <CudaCompile Include="CSimulationCudaReduce.cu" />
     <CudaCompile Include="LineSegment.cu" />
     <CudaCompile Include="OdeSolvers.cu" />
   </ItemGroup>

@@ -105,8 +105,7 @@ void CSimulationCuda::ResetState(const SimulationState& state)
 
 float CSimulationCuda::Update(float dt)
 {
-	CudaSafeCall(cudaMemcpyAsync(m_dt.get(), &dt, sizeof(dt), cudaMemcpyKind::cudaMemcpyHostToDevice));
-	m_odeSolver->NextState(m_dt, m_curOdeState, m_nextOdeState);
+	m_odeSolver->NextState(ComputeMinDeltaTime(dt), m_curOdeState, m_nextOdeState);
 	
 	ColorParticles();
 
@@ -124,7 +123,7 @@ void CSimulationCuda::ColorParticles()
 	const float2* nextVel = m_nextOdeState.data().get() + m_state.particles;
 	float4* colors = m_deviceColors.data().get();
 
-	ColorParticlesKernel <<<gridDim, blockDim >>> (m_dt.get(), m_state.particles, lastVel, nextVel, colors);
+	ColorParticlesKernel <<<gridDim, blockDim >>> (m_minDeltaTime.dt.get(), m_state.particles, lastVel, nextVel, colors);
 	CudaCheckError();
 
 	m_hostColors = m_deviceColors;

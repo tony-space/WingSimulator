@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <thrust/device_malloc.h>
+#include <thrust/device_vector.h>
 
 #include "../Simulation.hpp"
 #include "CudaInterfaces.cuh"
@@ -27,7 +28,12 @@ namespace wing2d
 
 				std::unique_ptr<IOdeSolver> m_odeSolver;
 
-				thrust::device_ptr<float> m_dt = thrust::device_malloc<float>(1);
+				struct
+				{
+					thrust::device_vector<float> input;
+					thrust::device_vector<uint8_t> cubInternalStorage;
+					thrust::device_ptr<float> dt = thrust::device_malloc<float>(1);
+				} m_minDeltaTime;
 				
 				thrust::device_vector<float4> m_deviceColors;
 				PinnedHostVector4D_t m_hostColors;
@@ -36,6 +42,7 @@ namespace wing2d
 
 				void CopyToGPU();
 				void ColorParticles();
+				const thrust::device_ptr<float>& ComputeMinDeltaTime(float requestedDt);
 			};
 		}
 	}
