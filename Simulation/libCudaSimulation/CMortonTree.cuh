@@ -39,14 +39,12 @@ namespace wing2d
 					TIndex* __restrict__ internalIndices;
 				};
 
-				void Build(const SBoundingBoxesSOA& leafs);
-				const SDeviceCollisions Traverse(const SBoundingBoxesSOA& objects, size_t maxCollisionsPerElement = 32);
+				void Build(const SBoundingBoxesAoS& leafs);
+				const SDeviceCollisions Traverse(const SBoundingBoxesAoS& objects, size_t maxCollisionsPerElement = 32);
 				const SDeviceCollisions TraverseReflexive(size_t maxCollisionsPerElement = 32);
 			private:
 				struct
 				{
-					thrust::device_vector<SBoundingBox> transformedBoxes;
-					thrust::device_vector<SBoundingBox> sortedBoxes;
 					thrust::device_ptr<SBoundingBox> sceneBox = thrust::device_malloc<SBoundingBox>(1);
 					thrust::device_vector<uint8_t> cubReductionTempStorage;
 				} m_sceneBox;
@@ -58,6 +56,8 @@ namespace wing2d
 
 					thrust::device_vector<uint32_t> sortedCodes;
 					thrust::device_vector<TIndex> sortedIndices;
+
+					thrust::device_vector<SBoundingBox> sortedBoxes;
 
 					thrust::device_vector<uint8_t> cubSortTempStorage;
 				} m_mortonCodes;
@@ -71,10 +71,10 @@ namespace wing2d
 
 				thrust::device_vector<TIndex> m_collisionIndices;
 
-				void EvaluateSceneBox(const SBoundingBoxesSOA& leafs);
-				void GenerateMortonCodes(const size_t objects);
-				void SortMortonCodes();
-				void InitTree(const SBoundingBoxesSOA& leafs);
+				void EvaluateSceneBox(const SBoundingBoxesAoS& objects);
+				void GenerateMortonCodes(const SBoundingBoxesAoS& objects);
+				void SortMortonCodes(const SBoundingBoxesAoS& objects);
+				void InitTree(const SBoundingBoxesAoS& leafs);
 				void BuildTree();
 			};
 		}

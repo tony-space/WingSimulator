@@ -55,7 +55,7 @@ static __global__ void AddGravityKernel(float2* forces, unsigned n)
 	forces[threadId].x += 0.5f;
 }
 
-static __global__ void BuildAirfoilBoxesKernel(SLineSegmentsSOA airfoil, SBoundingBoxesSOA boxes)
+static __global__ void BuildAirfoilBoxesKernel(SLineSegmentsSOA airfoil, SBoundingBoxesAoS boxes)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= airfoil.lineSegments)
@@ -67,22 +67,27 @@ static __global__ void BuildAirfoilBoxesKernel(SLineSegmentsSOA airfoil, SBoundi
 	const auto minCorner = fminf(f, s);
 	const auto maxCorner = fmaxf(f, s);
 
-	boxes.min[threadId] = minCorner;
-	boxes.max[threadId] = maxCorner;
+	boxes.boxes[threadId] = { minCorner, maxCorner };
 }
 
-static __global__ void BuildParticlesBoundingBoxesKernel(SBoundingBoxesSOA boundingBoxes, const float particleRad, const float2* __restrict__ particlePos)
+static __global__ void BuildParticlesBoundingBoxesKernel(const float2* __restrict__ particlePos, float particleRad, SBoundingBoxesAoS boundingBoxes, SBoundingBoxesAoS extendedBoxes)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= boundingBoxes.boundingBoxes)
+	if (threadId >= boundingBoxes.count)
 		return;
 
-	auto pos = particlePos[threadId];
+	const auto pos = particlePos[threadId];
 	auto minCorner = make_float2(pos.x - particleRad, pos.y - particleRad);
 	auto maxCorner = make_float2(pos.x + particleRad, pos.y + particleRad);
 
-	boundingBoxes.min[threadId] = minCorner;
-	boundingBoxes.max[threadId] = maxCorner;
+	boundingBoxes.boxes[threadId] = { minCorner, maxCorner };
+
+	particleRad *= 4.0f;
+
+	minCorner = make_float2(pos.x - particleRad, pos.y - particleRad);
+	maxCorner = make_float2(pos.x + particleRad, pos.y + particleRad);
+
+	extendedBoxes.boxes[threadId] = { minCorner, maxCorner };
 }
 
 static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState)
@@ -268,9 +273,10 @@ void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 
 
 	auto boxesStorage = m_particlesBoxesStorage.get();
+	auto extendedBoxesStorage = m_particlesExtendedBoxesStorage.get();
 
-	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>>(boxesStorage, m_particleRad, curState.data().get());
-	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>>(m_particlesExtendedBoxesStorage.get(), m_particleRad * 4.0f, curState.data().get());
+	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>> (curState.data().get(), m_particleRad, boxesStorage, extendedBoxesStorage);
+
 	CudaCheckError();
 
 	m_particlesTree.Build(boxesStorage);

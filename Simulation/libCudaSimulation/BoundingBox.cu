@@ -4,17 +4,15 @@ using namespace wing2d::simulation::cuda;
 
 CBoundingBoxesStorage::CBoundingBoxesStorage(size_t count)
 {
-	m_min.resize(count);
-	m_max.resize(count);
+	m_boxes.resize(count);
 }
 
-SBoundingBoxesSOA CBoundingBoxesStorage::get()
+SBoundingBoxesAoS CBoundingBoxesStorage::get()
 {
 	return
 	{
-		m_min.size(),
+		m_boxes.size(),
 
-		m_min.data().get(),
-		m_max.data().get()
+		m_boxes.data().get()
 	};
 }

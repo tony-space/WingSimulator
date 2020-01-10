@@ -29,27 +29,6 @@ namespace wing2d
 						dot(dirToCenter, normal[lineIdx])
 					);
 				}
-
-				float2 __device__ __forceinline__ ClosestPoint(const size_t lineIdx, const float2& pos) const
-				{
-					const auto f = first[lineIdx];
-					const auto r = ray[lineIdx];
-					const auto toPos = pos - f;
-					const auto projection = dot(r, toPos);
-
-					if (projection < 0.0f)
-					{
-						return f;
-					}
-					else if (projection >= 0.0f && projection <= length[lineIdx])
-					{
-						return f + r * projection;
-					}
-					else
-					{
-						return second[lineIdx];
-					}
-				}
 			};
 
 			class CLineSegmentsStorage

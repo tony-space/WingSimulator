@@ -16,18 +16,6 @@ struct BoxExpander
 	}
 };
 
-static __global__ void TransformBoxesKernel(const SBoundingBoxesSOA boxes, SBoundingBox* __restrict__ out)
-{
-	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= boxes.boundingBoxes)
-		return;
-
-	auto min = boxes.min[threadId];
-	auto max = boxes.max[threadId];
-
-	out[threadId] = {min, max};
-}
-
 static __global__ void OrderBoundingBoxesKernel(const SBoundingBox* __restrict__ unordered, TIndex* sortedIndices, size_t count, SBoundingBox* __restrict__ ordered)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -37,28 +25,21 @@ static __global__ void OrderBoundingBoxesKernel(const SBoundingBox* __restrict__
 	ordered[threadId] = unordered[sortedIndices[threadId]];
 }
 
-void CMortonTree::EvaluateSceneBox(const SBoundingBoxesSOA& leafs)
+void CMortonTree::EvaluateSceneBox(const SBoundingBoxesAoS& objects)
 {
-	m_sceneBox.transformedBoxes.resize(leafs.boundingBoxes);
-	m_sceneBox.sortedBoxes.resize(leafs.boundingBoxes);
-	auto boxesPtr = m_sceneBox.transformedBoxes.data().get();
-
-	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(leafs.boundingBoxes, kBlockSize));
-	TransformBoxesKernel <<<gridDim, blockDim >>> (leafs, boxesPtr);
-	CudaCheckError();
+	m_mortonCodes.sortedBoxes.resize(objects.count);
 
 	size_t storageBytes = 0;
 	CudaSafeCall(cub::DeviceReduce::Reduce(nullptr, storageBytes,
-				 boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), SBoundingBox()));
+				objects.boxes, m_sceneBox.sceneBox.get(), int(objects.count), BoxExpander(), SBoundingBox()));
 
 	m_sceneBox.cubReductionTempStorage.resize(storageBytes);
 
 	CudaSafeCall(cub::DeviceReduce::Reduce(m_sceneBox.cubReductionTempStorage.data().get(), storageBytes,
-				 boxesPtr, m_sceneBox.sceneBox.get(), int(leafs.boundingBoxes), BoxExpander(), SBoundingBox()));
+				objects.boxes, m_sceneBox.sceneBox.get(), int(objects.count), BoxExpander(), SBoundingBox()));
 }
 
-void CMortonTree::SortMortonCodes()
+void CMortonTree::SortMortonCodes(const SBoundingBoxesAoS& objects)
 {
 	size_t storageBytes = 0;
 
@@ -84,12 +65,12 @@ void CMortonTree::SortMortonCodes()
 
 
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(m_sceneBox.transformedBoxes.size(), kBlockSize));
+	dim3 gridDim(GridSize(objects.count, kBlockSize));
 	OrderBoundingBoxesKernel <<<gridDim, blockDim >>> (
-		m_sceneBox.transformedBoxes.data().get(),
+		objects.boxes,
 		m_mortonCodes.sortedIndices.data().get(),
-		m_sceneBox.transformedBoxes.size(),
-		m_sceneBox.sortedBoxes.data().get());
+		objects.count,
+		m_mortonCodes.sortedBoxes.data().get());
 	CudaCheckError();
 
 }

@@ -9,23 +9,6 @@ namespace wing2d
 	{
 		namespace cuda
 		{
-			struct SBoundingBoxesSOA
-			{
-				const size_t  boundingBoxes;
-				float2* __restrict__ min;
-				float2* __restrict__ max;
-			};
-
-			class CBoundingBoxesStorage
-			{
-			public:
-				CBoundingBoxesStorage(size_t count);
-				SBoundingBoxesSOA get();
-			private:
-				thrust::device_vector<float2> m_min;
-				thrust::device_vector<float2> m_max;
-			};
-
 			struct SBoundingBox
 			{
 				float2 min;
@@ -68,6 +51,21 @@ namespace wing2d
 						fmaxf(a.max, b.max)
 					};
 				}
+			};
+
+			struct SBoundingBoxesAoS
+			{
+				const size_t  count;
+				SBoundingBox* __restrict__ boxes;
+			};
+
+			class CBoundingBoxesStorage
+			{
+			public:
+				CBoundingBoxesStorage(size_t count);
+				SBoundingBoxesAoS get();
+			private:
+				thrust::device_vector<SBoundingBox> m_boxes;
 			};
 		}
 	}

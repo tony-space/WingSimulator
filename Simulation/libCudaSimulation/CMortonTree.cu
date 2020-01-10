@@ -214,17 +214,17 @@ static __device__ uint32_t Morton2D(uint16_t x, uint16_t y)
 	return (ExpandBy1(x) << 1) | ExpandBy1(y);
 }
 
-static __global__ void GenerateMortonCodesKernel(const size_t objects, const SBoundingBox* __restrict__ boxes, const SBoundingBox* __restrict__ pSceneBox, uint32_t* __restrict__ codes, TIndex* __restrict__ indices)
+static __global__ void GenerateMortonCodesKernel(const SBoundingBoxesAoS objects, const SBoundingBox* __restrict__ pSceneBox, uint32_t* __restrict__ codes, TIndex* __restrict__ indices)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= objects)
+	if (threadId >= objects.count)
 		return;
 
 	auto sceneBox = *pSceneBox;
 	auto sceneCenter = sceneBox.Center();
 	auto sceneSize = sceneBox.Size();
 
-	auto objectBox = boxes[threadId];
+	auto objectBox = objects.boxes[threadId];
 	auto objectCenter = objectBox.Center();
 
 	auto normalized = (objectCenter - sceneBox.min) / sceneSize;
@@ -237,7 +237,7 @@ static __global__ void GenerateMortonCodesKernel(const size_t objects, const SBo
 	indices[threadId] = TIndex(threadId);
 }
 
-static __global__ void InitTreeNodesPoolKernel(size_t count, CMortonTree::NodeType type, CMortonTree::STreeNode* __restrict__ nodes, float2* const __restrict__ pMin, float2* const __restrict__ pMax)
+static __global__ void InitTreeNodesPoolKernel(size_t count, CMortonTree::NodeType type, CMortonTree::STreeNode* __restrict__ nodes, const SBoundingBox* __restrict__ boxes)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= count)
@@ -252,9 +252,7 @@ static __global__ void InitTreeNodesPoolKernel(size_t count, CMortonTree::NodeTy
 	
 	if (type == CMortonTree::NodeType::Leaf)
 	{
-		auto min = pMin[threadId];
-		auto max = pMax[threadId];
-		result.box = { min, max };
+		result.box = boxes[threadId];
 	}
 	else
 	{
@@ -282,15 +280,15 @@ static __global__ void ConstructBoundingBoxesKernel(STreeInfo treeInfo)
 	treeInfo.ConstructBoundingBoxes(threadId);
 }
 
-static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBoundingBoxesSOA externalObjects, CMortonTree::SDeviceCollisions outResult)
+static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBoundingBoxesAoS externalObjects, CMortonTree::SDeviceCollisions outResult)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= externalObjects.boundingBoxes)
+	if (threadId >= externalObjects.count)
 		return;
 
 	extern __shared__ TIndex collisions[];
 
-	auto box = SBoundingBox(externalObjects.min[threadId], externalObjects.max[threadId]);
+	auto box = externalObjects.boxes[threadId];
 	treeInfo.Traverse(box, collisions, outResult.maxCollisionsPerElement);
 
 	for (size_t i = 0; i < outResult.maxCollisionsPerElement; ++i)
@@ -336,45 +334,45 @@ static __global__ void TraverseTreeReflexiveKernel(const STreeInfo treeInfo, CMo
 //
 //
 //
-void CMortonTree::Build(const SBoundingBoxesSOA& leafs)
+void CMortonTree::Build(const SBoundingBoxesAoS& leafs)
 {
 	EvaluateSceneBox(leafs);
-	GenerateMortonCodes(leafs.boundingBoxes);
-	SortMortonCodes();
+	GenerateMortonCodes(leafs);
+	SortMortonCodes(leafs);
 	InitTree(leafs);
 	BuildTree();
 }
 
-void CMortonTree::GenerateMortonCodes(const size_t objects)
+void CMortonTree::GenerateMortonCodes(const SBoundingBoxesAoS& objects)
 {
-	m_mortonCodes.unsortedCodes.resize(objects);
-	m_mortonCodes.unsortedIndices.resize(objects);
-	m_mortonCodes.sortedCodes.resize(objects);
-	m_mortonCodes.sortedIndices.resize(objects);
+	m_mortonCodes.unsortedCodes.resize(objects.count);
+	m_mortonCodes.unsortedIndices.resize(objects.count);
+	m_mortonCodes.sortedCodes.resize(objects.count);
+	m_mortonCodes.sortedIndices.resize(objects.count);
 
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(objects, kBlockSize));
-	GenerateMortonCodesKernel <<<gridDim, blockDim >>> (objects, m_sceneBox.transformedBoxes.data().get(), m_sceneBox.sceneBox.get(), m_mortonCodes.unsortedCodes.data().get(), m_mortonCodes.unsortedIndices.data().get());
+	dim3 gridDim(GridSize(objects.count, kBlockSize));
+	GenerateMortonCodesKernel <<<gridDim, blockDim >>> (objects, m_sceneBox.sceneBox.get(), m_mortonCodes.unsortedCodes.data().get(), m_mortonCodes.unsortedIndices.data().get());
 	CudaCheckError();
 }
 
-void CMortonTree::InitTree(const SBoundingBoxesSOA& leafs)
+void CMortonTree::InitTree(const SBoundingBoxesAoS& leafs)
 {
-	const auto leafsCount = leafs.boundingBoxes;
+	const auto leafsCount = leafs.count;
 	const auto internalCount = leafsCount - 1;
 
 	m_tree.internalNodesPool.resize(internalCount);
 	m_tree.leafNodesPool.resize(leafsCount);
 
-	if (leafs.boundingBoxes > 1)
+	if (leafsCount > 1)
 		m_tree.root = m_tree.internalNodesPool.data().get();
 	else
 		m_tree.root = m_tree.leafNodesPool.data().get();
 
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(leafsCount, kBlockSize));
-	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (internalCount, NodeType::Internal, m_tree.internalNodesPool.data().get(), nullptr, nullptr);
-	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (leafsCount, NodeType::Leaf, m_tree.leafNodesPool.data().get(), leafs.min, leafs.max);
+	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (internalCount, NodeType::Internal, m_tree.internalNodesPool.data().get(), nullptr);
+	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (leafsCount, NodeType::Leaf, m_tree.leafNodesPool.data().get(), leafs.boxes);
 	CudaCheckError();
 }
 
@@ -391,7 +389,7 @@ void CMortonTree::BuildTree()
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		m_sceneBox.sortedBoxes.data().get()
+		m_mortonCodes.sortedBoxes.data().get()
 	};
 
 	gridDim = dim3(GridSize(info.internalNodesCount, kBlockSize));
@@ -403,9 +401,9 @@ void CMortonTree::BuildTree()
 	CudaCheckError();
 }
 
-const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesSOA& objects, size_t maxCollisionsPerElement)
+const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesAoS& objects, size_t maxCollisionsPerElement)
 {
-	const auto externalCount = objects.boundingBoxes;
+	const auto externalCount = objects.count;
 	dim3 blockDim(32);
 	dim3 gridDim(GridSize(externalCount, blockDim.x));
 
@@ -417,7 +415,7 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesS
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		m_sceneBox.sortedBoxes.data().get()
+		m_mortonCodes.sortedBoxes.data().get()
 	};
 
 	const auto capactity = externalCount * maxCollisionsPerElement;
@@ -451,7 +449,7 @@ const CMortonTree::SDeviceCollisions CMortonTree::TraverseReflexive(size_t maxCo
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		m_sceneBox.sortedBoxes.data().get()
+		m_mortonCodes.sortedBoxes.data().get()
 	};
 
 	const auto capactity = count * maxCollisionsPerElement;
