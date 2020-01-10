@@ -406,8 +406,8 @@ void CMortonTree::BuildTree()
 const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesSOA& objects, size_t maxCollisionsPerElement)
 {
 	const auto externalCount = objects.boundingBoxes;
-	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(externalCount, kBlockSize));
+	dim3 blockDim(32);
+	dim3 gridDim(GridSize(externalCount, blockDim.x));
 
 	STreeInfo info = {
 		m_tree.internalNodesPool.size(),
