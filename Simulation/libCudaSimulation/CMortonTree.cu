@@ -151,7 +151,7 @@ struct STreeInfo
 		}
 	}
 
-	__device__ void Traverse(const SBoundingBox& box, TIndex * sharedMem, size_t maxCollisionsPerElement, size_t reflexiveIdx = size_t(-1)) const
+	__device__ void Traverse(const SBoundingBox& box, TIndex * sharedMem, size_t maxCollisionsPerElement, size_t reflexiveIdx) const
 	{
 		constexpr size_t kMaxStackSize = 64;
 		CMortonTree::STreeNode* stack[kMaxStackSize];
@@ -279,7 +279,7 @@ static __global__ void ConstructBoundingBoxesKernel(STreeInfo treeInfo)
 	treeInfo.ConstructBoundingBoxes(threadId);
 }
 
-static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBoundingBoxesAoS externalObjects, CMortonTree::SDeviceCollisions outResult)
+static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBoundingBoxesAoS externalObjects, bool reflexive, CMortonTree::SDeviceCollisions outResult)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= externalObjects.count)
@@ -288,7 +288,11 @@ static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBound
 	extern __shared__ TIndex collisions[];
 
 	auto box = externalObjects.boxes[threadId];
-	treeInfo.Traverse(box, collisions, outResult.maxCollisionsPerElement);
+	auto reflexiveIdx = size_t(-1);
+	if (reflexive)
+		reflexiveIdx = threadId;
+
+	treeInfo.Traverse(box, collisions, outResult.maxCollisionsPerElement, reflexiveIdx);
 
 	for (size_t i = 0; i < outResult.maxCollisionsPerElement; ++i)
 	{
@@ -395,7 +399,9 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const thrust::device_
 		m_collisionIndices.data().get()
 	};
 
-	TraverseTreeKernel <<<gridDim, blockDim, sizeof(TIndex) * blockDim.x * maxCollisionsPerElement>>> (info, SBoundingBoxesAoS::Create(objects), collisions);
+	auto reflexiveMode = &objects == &m_mortonCodes.sortedBoxes;
+
+	TraverseTreeKernel <<<gridDim, blockDim, sizeof(TIndex) * blockDim.x * maxCollisionsPerElement>>> (info, SBoundingBoxesAoS::Create(objects), reflexiveMode, collisions);
 
 	CudaCheckError();
 
