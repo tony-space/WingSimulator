@@ -23,27 +23,27 @@ static __device__ float2 SpringDamper2(const float2& normal, const float2& vel1,
 	return normal * (springLen * stiffness + v * damp) * -1.0f;
 }
 
-static __global__ void ParticleToWallKernel(const size_t particles, const float radius, const float2* __restrict__ pOdeState, SLineSegmentsSOA walls, float2* __restrict__ outForces)
+static __global__ void ParticleToWallKernel(CDerivativeSolver::SIntermediateSimState state, SLineSegmentsSOA walls)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particles)
+	if (threadId >= state.particles)
 		return;
 
-	const auto pos = pOdeState[threadId];
-	const auto vel = pOdeState[threadId + particles];
+	const auto pos = state.pos[threadId];
+	const auto vel = state.vel[threadId];
 	
-	auto force = outForces[threadId];
+	auto force = make_float2(0.0f);
 
 	for (size_t i = 0; i < walls.lineSegments; ++i)
 	{
-		const auto d = walls.DistanceToLine(i, pos) - radius;
+		const auto d = walls.DistanceToLine(i, pos) - state.particleRad;
 		if (d < 0.0f)
 		{
 			force += SpringDamper(walls.normal[i], vel, make_float2(0.0f), d);
 		}
 	}
 
-	outForces[threadId] = force;
+	state.force[threadId] += force;
 }
 
 static __global__ void AddGravityKernel(float2* forces, unsigned n)
@@ -70,7 +70,22 @@ static __global__ void BuildAirfoilBoxesKernel(SLineSegmentsSOA airfoil, SBoundi
 	boxes.boxes[threadId] = { minCorner, maxCorner };
 }
 
-static __global__ void BuildParticlesBoundingBoxesKernel(const float2* __restrict__ particlePos, float particleRad, SBoundingBoxesAoS boundingBoxes, SBoundingBoxesAoS extendedBoxes)
+static __global__ void ReorderAirfoilKernel(const SLineSegmentsSOA oldAirfoil, SLineSegmentsSOA newAirfoil, const TIndex* __restrict__ oldIndices)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= oldAirfoil.lineSegments)
+		return;
+
+	auto oldIdx = oldIndices[threadId];
+
+	newAirfoil.first[threadId] = oldAirfoil.first[oldIdx];
+	newAirfoil.second[threadId] = oldAirfoil.second[oldIdx];
+	newAirfoil.ray[threadId] = oldAirfoil.ray[oldIdx];
+	newAirfoil.normal[threadId] = oldAirfoil.normal[oldIdx];
+	newAirfoil.length[threadId] = oldAirfoil.length[oldIdx];
+}
+
+static __global__ void BuildParticlesBoundingBoxesKernel(const float2* __restrict__ particlePos, float particleRad, SBoundingBoxesAoS boundingBoxes)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= boundingBoxes.count)
@@ -81,13 +96,20 @@ static __global__ void BuildParticlesBoundingBoxesKernel(const float2* __restric
 	auto maxCorner = make_float2(pos.x + particleRad, pos.y + particleRad);
 
 	boundingBoxes.boxes[threadId] = { minCorner, maxCorner };
+}
 
-	particleRad *= 4.0f;
+static __global__ void ReorderParticlesKernel(const float2* __restrict__ originalStateVector, const TIndex* __restrict__ oldIndices, CDerivativeSolver::SIntermediateSimState simState)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= simState.particles)
+		return;
 
-	minCorner = make_float2(pos.x - particleRad, pos.y - particleRad);
-	maxCorner = make_float2(pos.x + particleRad, pos.y + particleRad);
+	auto oldPos = originalStateVector;
+	auto oldVel = oldPos + simState.particles;
 
-	extendedBoxes.boxes[threadId] = { minCorner, maxCorner };
+	auto oldIdx = oldIndices[threadId];
+	simState.pos[threadId] = oldPos[oldIdx];
+	simState.vel[threadId] = oldVel[oldIdx];
 }
 
 static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState)
@@ -105,7 +127,7 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 
 	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
-		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.elements + threadId];
+		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * simState.particles + threadId];
 		if (otherParticleIdx == threadId)
 			continue;
 		if (otherParticleIdx == TIndex(-1))
@@ -128,8 +150,8 @@ static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree
 		totalPressure += length(force);
 	}
 
-	simState.force[threadId] += totalForce;
-	simState.pressure[threadId] += totalPressure;
+	simState.force[threadId] = totalForce;
+	simState.pressure[threadId] = totalPressure;
 }
 
 static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState, SLineSegmentsSOA airfoil)
@@ -151,7 +173,7 @@ static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SD
 
 	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
 	{
-		const auto wingSegmentIdx = potentialCollisions.internalIndices[collisionIdx * potentialCollisions.elements + threadId];
+		const auto wingSegmentIdx = potentialCollisions.internalIndices[collisionIdx * simState.particles + threadId];
 		if (wingSegmentIdx == TIndex(-1))
 			break;
 
@@ -214,133 +236,161 @@ static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SD
 	}
 }
 
+static __global__ void InverseForcesOrderKernel(const CDerivativeSolver::SIntermediateSimState simState, const TIndex* __restrict__ oldIndices, float2* __restrict__ unorderedForces)
+{
+	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= simState.particles)
+		return;
+	auto oldIdx = oldIndices[threadId];
+	unorderedForces[oldIdx] = simState.force[threadId];
+}
+
 //
 //
 //
 CDerivativeSolver::CDerivativeSolver(size_t particles, float radius, const Segments_t& airfoil, const Segments_t& walls) :
-	m_airfoilStorage(airfoil),
+	m_airfoilStorage(airfoil.size()),
 	m_wallsStorage(walls),
-	m_airfoilsBoxesStorage(airfoil.size()),
-	m_particlesBoxesStorage(particles),
-	m_particlesExtendedBoxesStorage(particles),
-	m_forces(particles),
-	m_pressures(particles),
-	m_particles(particles),
-	m_particleRad(radius)
+	m_particlesBoxes(particles),
+	m_particlesExtendedBoxes(particles),
+	m_particles(particles, radius)
 {
+	auto tempAirfoilStorage = CLineSegmentsStorage(airfoil);
+	auto tempAirfoilBoxes = thrust::device_vector<SBoundingBox>(airfoil.size());
+
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(airfoil.size(), kBlockSize));
-	auto boxesStorage = m_airfoilsBoxesStorage.get();
-	BuildAirfoilBoxesKernel <<<gridDim, blockDim >>> (m_airfoilStorage.get(), boxesStorage);
+	BuildAirfoilBoxesKernel <<<gridDim, blockDim >>> (tempAirfoilStorage.get(), SBoundingBoxesAoS::Create(tempAirfoilBoxes));
 	CudaCheckError();
-	m_airfoilTree.Build(boxesStorage);
+	m_airfoilTree.Build(tempAirfoilBoxes);
+
+	ReorderAirfoilKernel <<<gridDim, blockDim >>> (tempAirfoilStorage.get(), m_airfoilStorage.get(), m_airfoilTree.GetSortedIndices().data().get());
+	CudaCheckError();
 }
 
 void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDerivative)
 {
-	ResetForces();
 	BuildParticlesTree(curState);
-	ResolveParticleParticleCollisions(curState);
-	ResolveParticleWingCollisions(curState);
-	ParticleToWall(curState);
+	ReorderParticles(curState);
+	ResolveParticleParticleCollisions();
+	ResolveParticleWingCollisions();
+	ParticleToWall();
 	ApplyGravity();
 	BuildDerivative(curState, outDerivative);
 }
 
-CDerivativeSolver::SIntermediateSimState CDerivativeSolver::GetSimState(const OdeState_t& curState)
+CDerivativeSolver::SIntermediateSimState CDerivativeSolver::SParticlesState::GetSimState()
 {
 	return
 	{
-		m_particles,
-		m_particleRad,
-		curState.data().get(),
-		curState.data().get() + m_particles,
-		m_forces.data().get(),
-		m_pressures.data().get()
+		count,
+		radius,
+		reorderedPositions.data().get(),
+		reorderedVelocities.data().get(),
+		forces.data().get(),
+		pressures.data().get(),
 	};
-}
-
-void CDerivativeSolver::ResetForces()
-{
-	CudaSafeCall(cudaMemsetAsync(m_forces.data().get(), 0, m_particles * sizeof(float2)));
-	CudaSafeCall(cudaMemsetAsync(m_pressures.data().get(), 0, m_particles * sizeof(float)));
 }
 
 void CDerivativeSolver::BuildParticlesTree(const OdeState_t& curState)
 {
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(m_particles, kBlockSize));
+	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
 
-
-	auto boxesStorage = m_particlesBoxesStorage.get();
-	auto extendedBoxesStorage = m_particlesExtendedBoxesStorage.get();
-
-	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>> (curState.data().get(), m_particleRad, boxesStorage, extendedBoxesStorage);
+	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>> (curState.data().get(), m_particles.radius, SBoundingBoxesAoS::Create(m_particlesBoxes));
 
 	CudaCheckError();
 
-	m_particlesTree.Build(boxesStorage);
+	m_particlesTree.Build(m_particlesBoxes);
 }
 
-void CDerivativeSolver::ResolveParticleParticleCollisions(const OdeState_t& curState)
+void CDerivativeSolver::ReorderParticles(const OdeState_t& curState)
 {
-	const auto collisionsResult = m_particlesTree.TraverseReflexive(128);
+	auto oldIndices = m_particlesTree.GetSortedIndices().data().get();
 
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(m_particles, kBlockSize));
+	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
 
-	ResolveParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (collisionsResult, GetSimState(curState));
+	ReorderParticlesKernel <<<gridDim, blockDim >>> (curState.data().get(), oldIndices, m_particles.GetSimState());
+	BuildParticlesBoundingBoxesKernel <<<gridDim, blockDim >>> (m_particles.reorderedPositions.data().get(), m_particles.radius * 4.0f, SBoundingBoxesAoS::Create(m_particlesExtendedBoxes));
+
+	CudaCheckError();
+}
+
+void CDerivativeSolver::ResolveParticleParticleCollisions()
+{
+	auto collisionsResult = m_particlesTree.Traverse(m_particlesTree.GetSortedBoxes(), 128);
+
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
+
+	ResolveParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (collisionsResult, m_particles.GetSimState());
 
 	CudaCheckError();
 
 }
 
-void CDerivativeSolver::ResolveParticleWingCollisions(const OdeState_t& curState)
+void CDerivativeSolver::ResolveParticleWingCollisions()
 {
-	const auto collisionsResult = m_airfoilTree.Traverse(m_particlesExtendedBoxesStorage.get());
+	const auto collisionsResult = m_airfoilTree.Traverse(m_particlesExtendedBoxes);
 
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(m_particles, kBlockSize));
+	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
 
-	auto simState = GetSimState(curState);
+	auto simState = m_particles.GetSimState();
 	ResolveParticleWingCollisionsKernel <<<gridDim, blockDim >>> (collisionsResult, simState, m_airfoilStorage.get());
 
 	CudaCheckError();
 }
 
-void CDerivativeSolver::ParticleToWall(const OdeState_t& curState)
+void CDerivativeSolver::ParticleToWall()
 {
-	auto elements = unsigned(m_particles);
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim((elements - 1) / blockDim.x + 1);
+	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
 
-	ParticleToWallKernel <<<gridDim, blockDim >>> (m_particles, m_particleRad, curState.data().get(), m_wallsStorage.get(), m_forces.data().get());
+	ParticleToWallKernel <<<gridDim, blockDim >>> (m_particles.GetSimState(), m_wallsStorage.get());
 	CudaCheckError();
 }
 
 void CDerivativeSolver::ApplyGravity()
 {
-	auto elements = unsigned(m_particles);
+	auto elements = unsigned(m_particles.count);
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim((elements - 1) / blockDim.x + 1);
 
-	AddGravityKernel <<<gridDim, blockDim >>> (m_forces.data().get(), elements);
+	AddGravityKernel <<<gridDim, blockDim >>> (m_particles.forces.data().get(), elements);
 	CudaCheckError();
 }
 
-void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const
+void CDerivativeSolver::BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative)
 {
-	const float2* d_velocities = curState.data().get() + m_particles;
-	const float2* d_forces = m_forces.data().get();
+	const float2* d_velocities = curState.data().get() + m_particles.count;
+	
+	//TODO: reorder forces back
+	const float2* d_forces = m_particles.forces.data().get();
 	float2* d_derivative = outDerivative.data().get();
 
-	const size_t dataBlockSize = m_particles * sizeof(float2);
+	const size_t dataBlockSize = m_particles.count * sizeof(float2);
 
 	CudaSafeCall(cudaMemcpyAsync(d_derivative, d_velocities, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice));
-	CudaSafeCall(cudaMemcpyAsync(d_derivative + m_particles, d_forces, dataBlockSize, cudaMemcpyKind::cudaMemcpyDeviceToDevice));
+
+	dim3 blockDim(kBlockSize);
+	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
+	InverseForcesOrderKernel <<<gridDim, blockDim >>> (
+		m_particles.GetSimState(),
+		m_particlesTree.GetSortedIndices().data().get(),
+		d_derivative + m_particles.count
+		);
+
+	CudaCheckError();
 }
 
 const thrust::device_vector<float>& CDerivativeSolver::GetPressures() const
 {
-	return m_pressures;
+	return m_particles.pressures;
+}
+
+const thrust::device_vector<TIndex>& CDerivativeSolver::GetParticlesIndices() const
+{
+	return m_particlesTree.GetSortedIndices();
 }

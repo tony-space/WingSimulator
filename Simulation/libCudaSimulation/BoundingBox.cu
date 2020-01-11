@@ -2,17 +2,20 @@
 
 using namespace wing2d::simulation::cuda;
 
-CBoundingBoxesStorage::CBoundingBoxesStorage(size_t count)
-{
-	m_boxes.resize(count);
-}
-
-SBoundingBoxesAoS CBoundingBoxesStorage::get()
+SBoundingBoxesAoS SBoundingBoxesAoS::Create(thrust::device_vector<SBoundingBox>& boxes)
 {
 	return
 	{
-		m_boxes.size(),
+		boxes.size(),
+		boxes.data().get()
+	};
+}
 
-		m_boxes.data().get()
+const SBoundingBoxesAoS SBoundingBoxesAoS::Create(const thrust::device_vector<SBoundingBox>& boxes)
+{
+	return
+	{
+		boxes.size(),
+		const_cast<SBoundingBox*>(boxes.data().get())
 	};
 }

@@ -39,9 +39,10 @@ namespace wing2d
 					TIndex* __restrict__ internalIndices;
 				};
 
-				void Build(const SBoundingBoxesAoS& leafs);
-				const SDeviceCollisions Traverse(const SBoundingBoxesAoS& objects, size_t maxCollisionsPerElement = 32);
-				const SDeviceCollisions TraverseReflexive(size_t maxCollisionsPerElement = 32);
+				void Build(const thrust::device_vector<SBoundingBox>& leafs);
+				const SDeviceCollisions Traverse(const thrust::device_vector<SBoundingBox>& objects, size_t maxCollisionsPerElement = 32);
+				const thrust::device_vector<TIndex>& GetSortedIndices() const;
+				const thrust::device_vector<SBoundingBox>& GetSortedBoxes() const;
 			private:
 				struct
 				{
@@ -71,10 +72,10 @@ namespace wing2d
 
 				thrust::device_vector<TIndex> m_collisionIndices;
 
-				void EvaluateSceneBox(const SBoundingBoxesAoS& objects);
-				void GenerateMortonCodes(const SBoundingBoxesAoS& objects);
-				void SortMortonCodes(const SBoundingBoxesAoS& objects);
-				void InitTree(const SBoundingBoxesAoS& leafs);
+				void EvaluateSceneBox(const thrust::device_vector<SBoundingBox>& objects);
+				void GenerateMortonCodes(const thrust::device_vector<SBoundingBox>& objects);
+				void SortMortonCodes(const thrust::device_vector<SBoundingBox>& objects);
+				void InitTree();
 				void BuildTree();
 			};
 		}

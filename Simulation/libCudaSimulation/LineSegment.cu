@@ -5,7 +5,16 @@
 
 using namespace wing2d::simulation::cuda;
 
-CLineSegmentsStorage::CLineSegmentsStorage(const Segments_t& segments)
+CLineSegmentsStorage::CLineSegmentsStorage(size_t count) : 
+	m_first(count),
+	m_second(count),
+	m_ray(count),
+	m_normal(count),
+	m_length(count)
+{
+}
+
+CLineSegmentsStorage::CLineSegmentsStorage(const Segments_t& segments) : CLineSegmentsStorage(segments.size())
 {
 	size_t count = segments.size();
 
@@ -38,7 +47,7 @@ CLineSegmentsStorage::CLineSegmentsStorage(const Segments_t& segments)
 	m_length = h_length;
 }
 
-SLineSegmentsSOA CLineSegmentsStorage::get() const
+SLineSegmentsSOA CLineSegmentsStorage::get()
 {
 	return
 	{

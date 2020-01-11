@@ -15,7 +15,6 @@ struct STreeInfo
 	CMortonTree::STreeNode* __restrict__ internalNodes;
 	CMortonTree::STreeNode* __restrict__ leafNodes;
 	const uint32_t* const __restrict__ sortedMortonCodes;
-	const TIndex* const __restrict__ sortedIndices;
 	const SBoundingBox* const __restrict__ objectBoxes;
 
 	__device__ ptrdiff_t Delta(size_t i, size_t j) const
@@ -294,39 +293,8 @@ static __global__ void TraverseTreeKernel(const STreeInfo treeInfo, const SBound
 	for (size_t i = 0; i < outResult.maxCollisionsPerElement; ++i)
 	{
 		const auto leafIdx = collisions[blockDim.x * i + threadIdx.x];
-		
-		auto objectIdx = TIndex(-1);
-		if (leafIdx != TIndex(-1))
-			objectIdx = treeInfo.sortedIndices[leafIdx];
-
-		outResult.internalIndices[outResult.elements * i + threadId] = objectIdx;
-		if (objectIdx == TIndex(-1))
-			break;
-	}
-}
-
-static __global__ void TraverseTreeReflexiveKernel(const STreeInfo treeInfo, CMortonTree::SDeviceCollisions outResult)
-{
-	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= treeInfo.leafNodesCount)
-		return;
-
-	extern __shared__ TIndex collisions[];
-
-	auto trueIdx = treeInfo.sortedIndices[threadId];
-	auto box = treeInfo.objectBoxes[threadId];
-	treeInfo.Traverse(box, collisions, outResult.maxCollisionsPerElement, threadId);
-
-	for (size_t i = 0; i < outResult.maxCollisionsPerElement; ++i)
-	{
-		const auto leafIdx = collisions[blockDim.x * i + threadIdx.x];
-
-		auto objectIdx = TIndex(-1);
-		if (leafIdx != TIndex(-1))
-			objectIdx = treeInfo.sortedIndices[leafIdx];
-
-		outResult.internalIndices[outResult.elements * i + trueIdx] = objectIdx;
-		if (objectIdx == TIndex(-1))
+		outResult.internalIndices[outResult.elements * i + threadId] = leafIdx;
+		if (leafIdx == TIndex(-1))
 			break;
 	}
 }
@@ -334,31 +302,32 @@ static __global__ void TraverseTreeReflexiveKernel(const STreeInfo treeInfo, CMo
 //
 //
 //
-void CMortonTree::Build(const SBoundingBoxesAoS& leafs)
+void CMortonTree::Build(const thrust::device_vector<SBoundingBox>& leafs)
 {
+	m_mortonCodes.unsortedCodes.resize(leafs.size());
+	m_mortonCodes.unsortedIndices.resize(leafs.size());
+	m_mortonCodes.sortedCodes.resize(leafs.size());
+	m_mortonCodes.sortedIndices.resize(leafs.size());
+	m_mortonCodes.sortedBoxes.resize(leafs.size());
+
 	EvaluateSceneBox(leafs);
 	GenerateMortonCodes(leafs);
 	SortMortonCodes(leafs);
-	InitTree(leafs);
+	InitTree();
 	BuildTree();
 }
 
-void CMortonTree::GenerateMortonCodes(const SBoundingBoxesAoS& objects)
+void CMortonTree::GenerateMortonCodes(const thrust::device_vector<SBoundingBox>& objects)
 {
-	m_mortonCodes.unsortedCodes.resize(objects.count);
-	m_mortonCodes.unsortedIndices.resize(objects.count);
-	m_mortonCodes.sortedCodes.resize(objects.count);
-	m_mortonCodes.sortedIndices.resize(objects.count);
-
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(objects.count, kBlockSize));
-	GenerateMortonCodesKernel <<<gridDim, blockDim >>> (objects, m_sceneBox.sceneBox.get(), m_mortonCodes.unsortedCodes.data().get(), m_mortonCodes.unsortedIndices.data().get());
+	dim3 gridDim(GridSize(objects.size(), kBlockSize));
+	GenerateMortonCodesKernel <<<gridDim, blockDim >>> (SBoundingBoxesAoS::Create(objects), m_sceneBox.sceneBox.get(), m_mortonCodes.unsortedCodes.data().get(), m_mortonCodes.unsortedIndices.data().get());
 	CudaCheckError();
 }
 
-void CMortonTree::InitTree(const SBoundingBoxesAoS& leafs)
+void CMortonTree::InitTree()
 {
-	const auto leafsCount = leafs.count;
+	const auto leafsCount = m_mortonCodes.sortedBoxes.size();
 	const auto internalCount = leafsCount - 1;
 
 	m_tree.internalNodesPool.resize(internalCount);
@@ -372,7 +341,7 @@ void CMortonTree::InitTree(const SBoundingBoxesAoS& leafs)
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(leafsCount, kBlockSize));
 	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (internalCount, NodeType::Internal, m_tree.internalNodesPool.data().get(), nullptr);
-	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (leafsCount, NodeType::Leaf, m_tree.leafNodesPool.data().get(), leafs.boxes);
+	InitTreeNodesPoolKernel <<<gridDim, blockDim >>> (leafsCount, NodeType::Leaf, m_tree.leafNodesPool.data().get(), m_mortonCodes.sortedBoxes.data().get());
 	CudaCheckError();
 }
 
@@ -388,7 +357,6 @@ void CMortonTree::BuildTree()
 		m_tree.internalNodesPool.data().get(),
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
-		m_mortonCodes.sortedIndices.data().get(),
 		m_mortonCodes.sortedBoxes.data().get()
 	};
 
@@ -401,9 +369,9 @@ void CMortonTree::BuildTree()
 	CudaCheckError();
 }
 
-const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesAoS& objects, size_t maxCollisionsPerElement)
+const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const thrust::device_vector<SBoundingBox>& objects, size_t maxCollisionsPerElement)
 {
-	const auto externalCount = objects.count;
+	const auto externalCount = objects.size();
 	dim3 blockDim(32);
 	dim3 gridDim(GridSize(externalCount, blockDim.x));
 
@@ -414,7 +382,6 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesA
 		m_tree.internalNodesPool.data().get(),
 		m_tree.leafNodesPool.data().get(),
 		m_mortonCodes.sortedCodes.data().get(),
-		m_mortonCodes.sortedIndices.data().get(),
 		m_mortonCodes.sortedBoxes.data().get()
 	};
 
@@ -428,43 +395,19 @@ const CMortonTree::SDeviceCollisions CMortonTree::Traverse(const SBoundingBoxesA
 		m_collisionIndices.data().get()
 	};
 
-	TraverseTreeKernel <<<gridDim, blockDim, sizeof(TIndex) * blockDim.x * maxCollisionsPerElement>>> (info, objects, collisions);
+	TraverseTreeKernel <<<gridDim, blockDim, sizeof(TIndex) * blockDim.x * maxCollisionsPerElement>>> (info, SBoundingBoxesAoS::Create(objects), collisions);
 
 	CudaCheckError();
 
 	return collisions;
 }
 
-const CMortonTree::SDeviceCollisions CMortonTree::TraverseReflexive(size_t maxCollisionsPerElement)
+const thrust::device_vector<TIndex>& CMortonTree::GetSortedIndices() const
 {
-	const auto count = m_tree.leafNodesPool.size();
-	dim3 blockDim(32);
-	dim3 gridDim(GridSize(count, blockDim.x));
+	return m_mortonCodes.sortedIndices;
+}
 
-	STreeInfo info = {
-		m_tree.internalNodesPool.size(),
-		m_tree.leafNodesPool.size(),
-		m_tree.root,
-		m_tree.internalNodesPool.data().get(),
-		m_tree.leafNodesPool.data().get(),
-		m_mortonCodes.sortedCodes.data().get(),
-		m_mortonCodes.sortedIndices.data().get(),
-		m_mortonCodes.sortedBoxes.data().get()
-	};
-
-	const auto capactity = count * maxCollisionsPerElement;
-	m_collisionIndices.resize(capactity);
-
-	SDeviceCollisions collisions =
-	{
-		count,
-		maxCollisionsPerElement,
-		m_collisionIndices.data().get()
-	};
-
-	TraverseTreeReflexiveKernel <<<gridDim, blockDim, sizeof(TIndex)* blockDim.x * maxCollisionsPerElement >>> (info, collisions);
-
-	CudaCheckError();
-
-	return collisions;
+const thrust::device_vector<SBoundingBox>& CMortonTree::GetSortedBoxes() const
+{
+	return m_mortonCodes.sortedBoxes;
 }

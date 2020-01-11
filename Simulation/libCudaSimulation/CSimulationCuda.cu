@@ -39,13 +39,16 @@ static __global__ void ColorParticlesKernel(const float* __restrict__ pDt, const
 	color[threadId] = GetHeatMapColor(logf(length(force) + 1.0f) / 10.0f + 0.15f);
 }
 
-static __global__ void ColorParticlesKernel2(const size_t nParticles, const float* __restrict__ pressures, float4* __restrict__ color)
+static __global__ void ColorParticlesKernel2(const size_t nParticles, const float* __restrict__ pressures, const TIndex* __restrict__ oldIndices, float4* __restrict__ color)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= nParticles)
 		return;
 
-	color[threadId] = GetHeatMapColor(logf(pressures[threadId] + 1.0f) / 10.0f + 0.15f);
+	auto oldIdx = oldIndices[threadId];
+	auto pressure = pressures[threadId];
+
+	color[oldIdx] = GetHeatMapColor(logf(pressure + 1.0f) / 10.0f + 0.15f);
 }
 
 
@@ -144,9 +147,10 @@ void CSimulationCuda::ColorParticles2()
 	dim3 gridDim(GridSize(m_state.particles, kBlockSize));
 
 	auto pressures = m_derivativeSolver->GetPressures().data().get();
+	auto oldIndices = m_derivativeSolver->GetParticlesIndices().data().get();
 	auto resultColors = m_deviceColors.data().get();
 
-	ColorParticlesKernel2 <<<gridDim, blockDim >>> (m_state.particles, pressures, resultColors);
+	ColorParticlesKernel2 <<<gridDim, blockDim >>> (m_state.particles, pressures, oldIndices, resultColors);
 	CudaCheckError();
 
 	m_hostColors = m_deviceColors;

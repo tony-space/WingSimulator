@@ -25,21 +25,19 @@ static __global__ void OrderBoundingBoxesKernel(const SBoundingBox* __restrict__
 	ordered[threadId] = unordered[sortedIndices[threadId]];
 }
 
-void CMortonTree::EvaluateSceneBox(const SBoundingBoxesAoS& objects)
+void CMortonTree::EvaluateSceneBox(const thrust::device_vector<SBoundingBox>& objects)
 {
-	m_mortonCodes.sortedBoxes.resize(objects.count);
-
 	size_t storageBytes = 0;
 	CudaSafeCall(cub::DeviceReduce::Reduce(nullptr, storageBytes,
-				objects.boxes, m_sceneBox.sceneBox.get(), int(objects.count), BoxExpander(), SBoundingBox()));
+				objects.data().get(), m_sceneBox.sceneBox.get(), int(objects.size()), BoxExpander(), SBoundingBox()));
 
 	m_sceneBox.cubReductionTempStorage.resize(storageBytes);
 
 	CudaSafeCall(cub::DeviceReduce::Reduce(m_sceneBox.cubReductionTempStorage.data().get(), storageBytes,
-				objects.boxes, m_sceneBox.sceneBox.get(), int(objects.count), BoxExpander(), SBoundingBox()));
+				objects.data().get(), m_sceneBox.sceneBox.get(), int(objects.size()), BoxExpander(), SBoundingBox()));
 }
 
-void CMortonTree::SortMortonCodes(const SBoundingBoxesAoS& objects)
+void CMortonTree::SortMortonCodes(const thrust::device_vector<SBoundingBox>& objects)
 {
 	size_t storageBytes = 0;
 
@@ -65,12 +63,11 @@ void CMortonTree::SortMortonCodes(const SBoundingBoxesAoS& objects)
 
 
 	dim3 blockDim(kBlockSize);
-	dim3 gridDim(GridSize(objects.count, kBlockSize));
+	dim3 gridDim(GridSize(objects.size(), kBlockSize));
 	OrderBoundingBoxesKernel <<<gridDim, blockDim >>> (
-		objects.boxes,
+		objects.data().get(),
 		m_mortonCodes.sortedIndices.data().get(),
-		objects.count,
+		objects.size(),
 		m_mortonCodes.sortedBoxes.data().get());
 	CudaCheckError();
-
 }

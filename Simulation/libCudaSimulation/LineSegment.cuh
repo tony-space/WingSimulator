@@ -12,12 +12,12 @@ namespace wing2d
 		{
 			struct SLineSegmentsSOA
 			{
-				const size_t  lineSegments;
-				const float2* __restrict__ first;
-				const float2* __restrict__ second;
-				const float2* __restrict__ ray;
-				const float2* __restrict__ normal;
-				const float* __restrict__ length;
+				size_t  lineSegments;
+				float2* __restrict__ first;
+				float2* __restrict__ second;
+				float2* __restrict__ ray;
+				float2* __restrict__ normal;
+				float* __restrict__ length;
 
 				float __device__ __forceinline__ DistanceToLine(const size_t lineIdx, const float2& pos)
 				{
@@ -34,9 +34,10 @@ namespace wing2d
 			class CLineSegmentsStorage
 			{
 			public:
+				CLineSegmentsStorage(size_t count);
 				CLineSegmentsStorage(const Segments_t& segments);
 
-				SLineSegmentsSOA get() const;
+				SLineSegmentsSOA get();
 			private:
 				thrust::device_vector<float2> m_first;
 				thrust::device_vector<float2> m_second;

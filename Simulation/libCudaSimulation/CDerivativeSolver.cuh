@@ -24,8 +24,8 @@ namespace wing2d
 					const size_t particles;
 					const float particleRad;
 
-					const float2* __restrict__ pos;
-					const float2* __restrict__ vel;
+					float2* __restrict__ pos;
+					float2* __restrict__ vel;
 					float2* __restrict__ force;
 					float* __restrict__ pressure;
 				};
@@ -35,32 +35,49 @@ namespace wing2d
 				virtual void Derive(const OdeState_t& curState, OdeState_t& outDerivative) override;
 
 				const thrust::device_vector<float>& GetPressures() const;
+				const thrust::device_vector<TIndex>& GetParticlesIndices() const;
 			private:
 				CLineSegmentsStorage m_airfoilStorage;
 				CLineSegmentsStorage m_wallsStorage;
 
-				CBoundingBoxesStorage m_airfoilsBoxesStorage;
-				CBoundingBoxesStorage m_particlesBoxesStorage;
-				CBoundingBoxesStorage m_particlesExtendedBoxesStorage;
+				thrust::device_vector<SBoundingBox> m_particlesBoxes;
+				thrust::device_vector<SBoundingBox> m_particlesExtendedBoxes;
 
-				const size_t m_particles;
-				const float m_particleRad;
+				struct SParticlesState
+				{
+					const size_t count;
+					const float radius;
 
-				thrust::device_vector<float2> m_forces;
-				thrust::device_vector<float> m_pressures;
+					thrust::device_vector<float2> reorderedPositions;
+					thrust::device_vector<float2> reorderedVelocities;
+					thrust::device_vector<float2> forces;
+					thrust::device_vector<float> pressures;
+
+					SParticlesState(size_t _count, float _radius) :
+						count(_count),
+						radius(_radius),
+						reorderedPositions(_count),
+						reorderedVelocities(_count),
+						forces(_count),
+						pressures(_count)
+					{
+					}
+
+					SIntermediateSimState GetSimState();
+
+				} m_particles;
 
 				CMortonTree m_particlesTree;
 				CMortonTree m_airfoilTree;
 
-				SIntermediateSimState GetSimState(const OdeState_t& curState);
 
-				void ResetForces();
 				void BuildParticlesTree(const OdeState_t& curState);
-				void ResolveParticleParticleCollisions(const OdeState_t& curState);
-				void ResolveParticleWingCollisions(const OdeState_t& curState);
-				void ParticleToWall(const OdeState_t& curState);
+				void ReorderParticles(const OdeState_t& curState);
+				void ResolveParticleParticleCollisions();
+				void ResolveParticleWingCollisions();
+				void ParticleToWall();
 				void ApplyGravity();
-				void BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative) const;
+				void BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative);
 			};
 		}
 	}

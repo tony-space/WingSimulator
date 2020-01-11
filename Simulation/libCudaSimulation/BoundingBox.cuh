@@ -57,15 +57,9 @@ namespace wing2d
 			{
 				const size_t  count;
 				SBoundingBox* __restrict__ boxes;
-			};
-
-			class CBoundingBoxesStorage
-			{
-			public:
-				CBoundingBoxesStorage(size_t count);
-				SBoundingBoxesAoS get();
-			private:
-				thrust::device_vector<SBoundingBox> m_boxes;
+				
+				static SBoundingBoxesAoS Create(thrust::device_vector<SBoundingBox>& boxes);
+				static const SBoundingBoxesAoS Create(const thrust::device_vector<SBoundingBox>& boxes);
 			};
 		}
 	}
