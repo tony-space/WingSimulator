@@ -16,20 +16,24 @@ namespace wing2d
 			class CMortonTree
 			{
 			public:
-				enum class NodeType
+				struct STreeNodeSoA
 				{
-					Leaf,
-					Internal
-				};
-				struct STreeNode
-				{
-					NodeType type;
-					int atomicVisited;
+					const TIndex leafs;
 
-					SBoundingBox box;
-					STreeNode* __restrict__ parent;
-					STreeNode* __restrict__ left;
-					STreeNode* __restrict__ right;
+					int* __restrict__ atomicVisits;
+					TIndex* __restrict__ parents;
+					TIndex* __restrict__ lefts;
+					TIndex* __restrict__ rights;
+					SBoundingBox* __restrict__ boxes;
+					const uint32_t* __restrict__ sortedMortonCodes;
+
+					static __device__ ptrdiff_t Sign(ptrdiff_t x);
+					__device__ ptrdiff_t Delta(size_t i, size_t j) const;
+					__device__ size_t FindSplit(size_t i, size_t j) const;
+					__device__ size_t FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const;
+					__device__ void ProcessInternalNode(size_t i);
+					__device__ void ConstructBoundingBoxes(size_t leafId);
+					__device__ void Traverse(const SBoundingBox& box, TIndex* sharedMem, size_t maxCollisionsPerElement, size_t reflexiveIdx) const;
 				};
 
 				struct SDeviceCollisions
@@ -63,11 +67,28 @@ namespace wing2d
 					thrust::device_vector<uint8_t> cubSortTempStorage;
 				} m_mortonCodes;
 
-				struct
+				struct STreeNodesStorage
 				{
-					thrust::device_vector<STreeNode> leafNodesPool;
-					thrust::device_vector<STreeNode> internalNodesPool;
-					STreeNode* root = nullptr;
+					TIndex leafs;
+					thrust::device_vector<int> atomicVisited;
+					thrust::device_vector<TIndex> parent;
+					thrust::device_vector<TIndex> left;
+					thrust::device_vector<TIndex> right;
+					thrust::device_vector<SBoundingBox> boxes;
+
+					STreeNodeSoA get(const thrust::device_vector<uint32_t>& sortedCodes)
+					{
+						return
+						{
+							leafs,
+							atomicVisited.data().get(),
+							parent.data().get(),
+							left.data().get(),
+							right.data().get(),
+							boxes.data().get(),
+							sortedCodes.data().get()
+						};
+					}
 				} m_tree;
 
 				thrust::device_vector<TIndex> m_collisionIndices;

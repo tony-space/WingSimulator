@@ -116,12 +116,13 @@ void CSimulationCuda::ResetState(const SimulationState& state)
 
 float CSimulationCuda::Update(float dt)
 {
-	m_odeSolver->NextState(ComputeMinDeltaTime(dt), m_curOdeState, m_nextOdeState);
+	for (int i = 0; i < 4; ++i)
+	{
+		m_odeSolver->NextState(ComputeMinDeltaTime(dt), m_curOdeState, m_nextOdeState);
+		m_nextOdeState.swap(m_curOdeState);
+	}
 	
 	ColorParticles2();
-
-	m_nextOdeState.swap(m_curOdeState);
-
 	return dt;
 }
 
