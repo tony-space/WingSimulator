@@ -145,7 +145,7 @@ __device__ void CMortonTree::STreeNodeSoA::Traverse(const SBoundingBox& box, TIn
 {
 	const auto internalNodes = leafs - 1;
 
-	constexpr size_t kMaxStackSize = 64;
+	constexpr size_t kMaxStackSize = 32;
 	TIndex stack[kMaxStackSize];
 	unsigned top = 0;
 	stack[top] = 0;
@@ -172,14 +172,21 @@ __device__ void CMortonTree::STreeNodeSoA::Traverse(const SBoundingBox& box, TIn
 				collisionIdx++;
 
 				if (collisionIdx >= maxCollisionsPerElement)
+				{
+					printf("collisions list size exceeded\n");
 					return;
+				}
 			}
 			else
 			{
 				stack[++top] = lefts[cur];
-				if (top < kMaxStackSize)
+				if (top + 1 < kMaxStackSize)
 				{
 					stack[++top] = rights[cur];
+				}
+				else
+				{
+					printf("stack size exceeded\n");
 				}
 			}
 		}
