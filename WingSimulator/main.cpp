@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
-constexpr size_t kParticles = 4096 * 512;
-constexpr float kParticleRad = 0.002f;
+constexpr size_t kParticles = 4096 * 64;
+constexpr float kParticleRad = 0.004f;
 
 //constexpr size_t kParticles = 2048;
 //constexpr float kParticleRad = 0.01f;
@@ -91,11 +91,18 @@ void SetupState(wing2d::simulation::ISimulation* simulation, std::vector<wing2d:
 
 	for (size_t i = 0; i < kParticles; ++i)
 	{
-		auto x = glm::linearRand(-4.0f, -1.25f);
-		auto y = glm::linearRand(-1.0f, 1.0f);
+		/*auto x = glm::linearRand(-4.0f, -1.25f);
+		auto y = glm::linearRand(-1.0f, 1.0f);*/
+		auto diskRand = glm::diskRand(0.33f);
+		auto rand = diskRand + glm::vec2(-1.0f, -0.25f);
+		auto x = rand.x;
+		auto y = rand.y;
 
 		state.pos[i] = std::make_tuple(x, y);
-		state.vel[i] = std::make_tuple(1.0f, 0.0f);
+		//state.vel[i] = std::make_tuple(1.0f, 0.0f);
+
+		auto normalized = (diskRand + glm::vec2(0.33f)) / 0.66f;
+		state.color[i] = std::make_tuple(normalized.x, normalized.y, 1.0f, 1.0f);
 	}
 
 	glm::mat3 modelMat = glm::identity<glm::mat3>();

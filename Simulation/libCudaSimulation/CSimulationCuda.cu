@@ -79,9 +79,9 @@ static Segments_t BuildWalls(const SimulationState& state)
 	Segments_t result;
 
 	result.emplace_back(std::make_tuple(topRight, topLeft));
-	//result.emplace_back(std::make_tuple(bottomRight, topRight));
+	result.emplace_back(std::make_tuple(bottomRight, topRight));
 	result.emplace_back(std::make_tuple(bottomLeft, bottomRight));
-	//result.emplace_back(std::make_tuple(topLeft, bottomLeft));
+	result.emplace_back(std::make_tuple(topLeft, bottomLeft));
 
 	return result;
 }
@@ -122,7 +122,7 @@ float CSimulationCuda::Update(float dt)
 		m_nextOdeState.swap(m_curOdeState);
 	}
 	
-	ColorParticles2();
+	//ColorParticles2();
 	return dt;
 }
 

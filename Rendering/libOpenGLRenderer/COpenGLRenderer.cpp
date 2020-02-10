@@ -130,14 +130,14 @@ void COpenGLRenderer::RenderAsync(const simulation::SimulationState& state)
 		glBindVertexArray(0);
 	}
 
-	glColor3f(0.75f, 0.75f, 0.75f);
-	glBegin(GL_LINE_LOOP);
-	for (const auto& v : state.airfoil)
-	{
-		auto& [x, y] = v;
-		glVertex2f(x, y);
-	}
-	glEnd();
+	//glColor3f(0.75f, 0.75f, 0.75f);
+	//glBegin(GL_LINE_LOOP);
+	//for (const auto& v : state.airfoil)
+	//{
+	//	auto& [x, y] = v;
+	//	glVertex2f(x, y);
+	//}
+	//glEnd();
 
 	/*glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_POINTS);

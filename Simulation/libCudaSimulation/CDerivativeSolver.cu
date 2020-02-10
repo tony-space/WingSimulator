@@ -12,7 +12,7 @@ using namespace wing2d::simulation::cuda;
 static __device__ float2 SpringDamper(const float2& normal, const float2& vel1, const float2& vel2, float springLen)
 {
 	constexpr float stiffness = 10000.0f;
-	constexpr float damp = 50.0f;
+	constexpr float damp = 10.0f;
 	auto v = dot(vel1 - vel2, normal);
 	return normal * (springLen * stiffness + v * damp) * -1.0f;
 }
@@ -313,9 +313,9 @@ void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDeriva
 	ReorderParticles(curState);
 	ResetParticlesState();
 	ResolveParticleParticleCollisions();
-	ResolveParticleWingCollisions();
+	//ResolveParticleWingCollisions();
 	ParticleToWall();
-	ApplyGravity();
+	//ApplyGravity();
 	BuildDerivative(curState, outDerivative);
 }
 
