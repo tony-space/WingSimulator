@@ -24,6 +24,7 @@ namespace wing2d
 					TIndex* __restrict__ parents;
 					TIndex* __restrict__ lefts;
 					TIndex* __restrict__ rights;
+					TIndex* __restrict__ rightmosts;
 					SBoundingBox* __restrict__ boxes;
 					const uint32_t* __restrict__ sortedMortonCodes;
 
@@ -32,7 +33,7 @@ namespace wing2d
 					__device__ size_t FindSplit(size_t i, size_t j) const;
 					__device__ size_t FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const;
 					__device__ void ProcessInternalNode(size_t i);
-					__device__ void ConstructBoundingBoxes(size_t leafId);
+					__device__ void BottomToTopInitialization(size_t leafId);
 					__device__ void Traverse(const SBoundingBox& box, TIndex* sharedMem, size_t maxCollisionsPerElement, size_t reflexiveIdx) const;
 				};
 
@@ -47,6 +48,9 @@ namespace wing2d
 				const SDeviceCollisions Traverse(const thrust::device_vector<SBoundingBox>& objects, size_t maxCollisionsPerElement = 32);
 				const thrust::device_vector<TIndex>& GetSortedIndices() const;
 				const thrust::device_vector<SBoundingBox>& GetSortedBoxes() const;
+
+				template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize = 32>
+				void TraverseReflexive(const TDeviceCollisionResponseSolver& solver);
 			private:
 				struct
 				{
@@ -74,6 +78,7 @@ namespace wing2d
 					thrust::device_vector<TIndex> parent;
 					thrust::device_vector<TIndex> left;
 					thrust::device_vector<TIndex> right;
+					thrust::device_vector<TIndex> rightmost;
 					thrust::device_vector<SBoundingBox> boxes;
 
 					STreeNodeSoA get(const thrust::device_vector<uint32_t>& sortedCodes)
@@ -85,6 +90,7 @@ namespace wing2d
 							parent.data().get(),
 							left.data().get(),
 							right.data().get(),
+							rightmost.data().get(),
 							boxes.data().get(),
 							sortedCodes.data().get()
 						};

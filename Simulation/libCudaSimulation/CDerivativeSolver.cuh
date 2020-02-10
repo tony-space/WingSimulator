@@ -23,6 +23,8 @@ namespace wing2d
 				{
 					const size_t particles;
 					const float particleRad;
+					const float diameter;
+					const float diameterSq;
 
 					float2* __restrict__ pos;
 					float2* __restrict__ vel;
@@ -73,6 +75,7 @@ namespace wing2d
 
 				void BuildParticlesTree(const OdeState_t& curState);
 				void ReorderParticles(const OdeState_t& curState);
+				void ResetParticlesState();
 				void ResolveParticleParticleCollisions();
 				void ResolveParticleWingCollisions();
 				void ParticleToWall();

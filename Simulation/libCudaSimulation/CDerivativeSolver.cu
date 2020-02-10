@@ -5,6 +5,8 @@
 #include "CudaLaunchHelpers.cuh"
 #include "CDerivativeSolver.cuh"
 
+#include "CMortonTreeTraversal.cuh"
+
 using namespace wing2d::simulation::cuda;
 
 static __device__ float2 SpringDamper(const float2& normal, const float2& vel1, const float2& vel2, float springLen)
@@ -112,47 +114,84 @@ static __global__ void ReorderParticlesKernel(const float2* __restrict__ origina
 	simState.vel[threadId] = oldVel[oldIdx];
 }
 
-static __global__ void ResolveParticleParticleCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState)
+static __global__ void ResetParticlesStateKernel(CDerivativeSolver::SIntermediateSimState simState)
 {
 	const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= simState.particles)
 		return;
 
-	const auto pos1 = simState.pos[threadId];
-	const auto vel1 = simState.vel[threadId];
-	const auto diameter = simState.particleRad * 2.0f;
-	const auto diameterSq = diameter * diameter;
-	auto totalForce = make_float2(0.0f);
-	auto totalPressure = 0.0f;
+	simState.force[threadId] = make_float2(0.0f);
+	simState.pressure[threadId] = 0.0f;
+}
 
-	for (size_t collisionIdx = 0; collisionIdx < potentialCollisions.maxCollisionsPerElement; ++collisionIdx)
+struct SParticleParticleCollisionSolver
+{
+	struct SDeviceSideSolver
 	{
-		const auto otherParticleIdx = potentialCollisions.internalIndices[collisionIdx * simState.particles + threadId];
-		if (otherParticleIdx == threadId)
-			continue;
-		if (otherParticleIdx == TIndex(-1))
-			break;
+		CDerivativeSolver::SIntermediateSimState& simState;
+		TIndex curIdx;
+		float2 pos1;
+		float2 vel1;
+		float2 totalForce;
+		float totalPressure;
 
-		const auto pos2 = simState.pos[otherParticleIdx];
-		const auto deltaPos = pos2 - pos1;
-		const auto distanceSq = dot(deltaPos, deltaPos);
-		if (distanceSq > diameterSq || distanceSq < 1e-8f)
-			continue;
+		__device__ SDeviceSideSolver(CDerivativeSolver::SIntermediateSimState& state) : simState(state)
+		{
 
-		const auto vel2 = simState.vel[otherParticleIdx];
+		}
 
-		auto dist = sqrtf(distanceSq);
-		auto dir = deltaPos / dist;
-		auto springLen = diameter - dist;
+		__device__ void OnPreTraversal(TIndex curLeafIdx)
+		{
+			curIdx = curLeafIdx;
+			pos1 = simState.pos[curLeafIdx];
+			vel1 = simState.vel[curLeafIdx];
+			totalForce = make_float2(0.0f);
+			totalPressure = 0.0f;
+		}
 
-		auto force = SpringDamper(dir, vel1, vel2, springLen);
-		totalForce += force;
-		totalPressure += length(force);
+		__device__ void OnCollisionDetected(TIndex anotherLeafIdx)
+		{
+			const auto pos2 = simState.pos[anotherLeafIdx];
+			const auto deltaPos = pos2 - pos1;
+			const auto distanceSq = dot(deltaPos, deltaPos);
+			if (distanceSq > simState.diameterSq || distanceSq < 1e-8f)
+				return;
+
+			const auto vel2 = simState.vel[anotherLeafIdx];
+
+			auto dist = sqrtf(distanceSq);
+			auto dir = deltaPos / dist;
+			auto springLen = simState.diameter - dist;
+
+			auto force = SpringDamper(dir, vel1, vel2, springLen);
+			auto pressure = length(force);
+			totalForce += force;
+			totalPressure += pressure;
+
+			atomicAdd(&simState.force[anotherLeafIdx].x, -force.x);
+			atomicAdd(&simState.force[anotherLeafIdx].y, -force.y);
+			atomicAdd(&simState.pressure[anotherLeafIdx], pressure);
+		}
+
+		__device__ void OnPostTraversal()
+		{
+			atomicAdd(&simState.force[curIdx].x, totalForce.x);
+			atomicAdd(&simState.force[curIdx].y, totalForce.y);
+			atomicAdd(&simState.pressure[curIdx], totalPressure);
+		}
+	};
+
+	CDerivativeSolver::SIntermediateSimState simState;
+
+	SParticleParticleCollisionSolver(const CDerivativeSolver::SIntermediateSimState& state) : simState(state)
+	{
 	}
 
-	simState.force[threadId] = totalForce;
-	simState.pressure[threadId] = totalPressure;
-}
+	__device__ SDeviceSideSolver Create()
+	{
+		return SDeviceSideSolver(simState);
+	}
+};
 
 static __global__ void ResolveParticleWingCollisionsKernel(const CMortonTree::SDeviceCollisions potentialCollisions, CDerivativeSolver::SIntermediateSimState simState, SLineSegmentsSOA airfoil)
 {
@@ -272,6 +311,7 @@ void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDeriva
 {
 	BuildParticlesTree(curState);
 	ReorderParticles(curState);
+	ResetParticlesState();
 	ResolveParticleParticleCollisions();
 	ResolveParticleWingCollisions();
 	ParticleToWall();
@@ -285,6 +325,9 @@ CDerivativeSolver::SIntermediateSimState CDerivativeSolver::SParticlesState::Get
 	{
 		count,
 		radius,
+		radius * 2.0f,
+		radius * radius * 4.0f,
+
 		reorderedPositions.data().get(),
 		reorderedVelocities.data().get(),
 		forces.data().get(),
@@ -317,17 +360,18 @@ void CDerivativeSolver::ReorderParticles(const OdeState_t& curState)
 	CudaCheckError();
 }
 
-void CDerivativeSolver::ResolveParticleParticleCollisions()
+void CDerivativeSolver::ResetParticlesState()
 {
-	auto collisionsResult = m_particlesTree.Traverse(m_particlesTree.GetSortedBoxes(), 128);
-
 	dim3 blockDim(kBlockSize);
 	dim3 gridDim(GridSize(m_particles.count, kBlockSize));
 
-	ResolveParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (collisionsResult, m_particles.GetSimState());
+	ResetParticlesStateKernel <<<gridDim, blockDim >>> (m_particles.GetSimState());
+}
 
+void CDerivativeSolver::ResolveParticleParticleCollisions()
+{
+	m_particlesTree.TraverseReflexive(SParticleParticleCollisionSolver(m_particles.GetSimState()));
 	CudaCheckError();
-
 }
 
 void CDerivativeSolver::ResolveParticleWingCollisions()

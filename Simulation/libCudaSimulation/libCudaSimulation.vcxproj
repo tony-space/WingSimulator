@@ -93,6 +93,7 @@
     <ClInclude Include="BoundingBox.cuh" />
     <ClInclude Include="CDerivativeSolver.cuh" />
     <ClInclude Include="CMortonTree.cuh" />
+    <ClInclude Include="CMortonTreeTraversal.cuh" />
     <ClInclude Include="CSimulationCuda.cuh" />
     <ClInclude Include="CudaInterfaces.cuh" />
     <ClInclude Include="CudaLaunchHelpers.cuh" />
