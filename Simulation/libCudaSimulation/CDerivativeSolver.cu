@@ -54,7 +54,7 @@ static __global__ void AddGravityKernel(float2* forces, unsigned n)
 	if (threadId >= n)
 		return;
 
-	forces[threadId].x += 0.5f;
+	forces[threadId].y -= 0.5f;
 }
 
 static __global__ void BuildAirfoilBoxesKernel(SLineSegmentsSOA airfoil, SBoundingBoxesAoS boxes)
@@ -315,7 +315,7 @@ void CDerivativeSolver::Derive(const OdeState_t& curState, OdeState_t& outDeriva
 	ResolveParticleParticleCollisions();
 	//ResolveParticleWingCollisions();
 	ParticleToWall();
-	//ApplyGravity();
+	ApplyGravity();
 	BuildDerivative(curState, outDerivative);
 }
 

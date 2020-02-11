@@ -17,7 +17,7 @@ static __global__ void ComputeMinTimesKernel(const float2* __restrict__ velociti
 		return;
 
 	auto vel = length(velocities[threadId]);
-	auto halfRadDt = rad / (vel * 3.0f);
+	auto halfRadDt = rad / vel;
 
 	outTimes[threadId] = fminf(halfRadDt, requestedDt);
 }
