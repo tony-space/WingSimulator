@@ -2,7 +2,6 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <cooperative_groups.h>
 
 #include "CMortonTree.cuh"
 
@@ -15,8 +14,6 @@ namespace wing2d
 			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize, size_t kWarpSize = 32, size_t kCacheSize = 32>
 			__global__ void TraverseMortonTreeReflexiveKernel(const CMortonTree::STreeNodeSoA treeInfo, TDeviceCollisionResponseSolver solver)
 			{
-				namespace cg = cooperative_groups;
-
 				const auto leafId = blockIdx.x * blockDim.x + threadIdx.x;
 				if (leafId >= treeInfo.leafs)
 					return;
@@ -41,25 +38,21 @@ namespace wing2d
 					if (treeInfo.rightmosts[cur] < leafId)
 						continue;
 
-					if (treeInfo.boxes[cur].Overlaps(leafBox))
+					if (!treeInfo.boxes[cur].Overlaps(leafBox))
+						continue;
+					
+					if (cur < internalCount) //if leaf
 					{
-						if (cur >= internalCount) //if leaf
-						{
-							deviceSideSolver.OnCollisionDetected(cur - internalCount);
-						}
+						stack[++top][threadIdx.x] = treeInfo.lefts[cur];
+						if (top + 1 < kTreeStackSize)
+							stack[++top][threadIdx.x] = treeInfo.rights[cur];
 						else
-						{
-							stack[++top][threadIdx.x] = treeInfo.lefts[cur];
-							if (top + 1 < kTreeStackSize)
-							{
-								stack[++top][threadIdx.x] = treeInfo.rights[cur];
-							}
-							else
-							{
-								printf("stack size exceeded\n");
-							}
-						}
+							printf("stack size exceeded\n");
+
+						continue;
 					}
+					
+					deviceSideSolver.OnCollisionDetected(cur - internalCount);
 				}
 
 				deviceSideSolver.OnPostTraversal();
