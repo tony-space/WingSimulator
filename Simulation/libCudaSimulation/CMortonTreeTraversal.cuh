@@ -1,4 +1,8 @@
 #pragma once
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+#include <cooperative_groups.h>
 
 #include "CMortonTree.cuh"
 
@@ -8,9 +12,11 @@ namespace wing2d
 	{
 		namespace cuda
 		{
-			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize>
-			__global__ void TraverseTreeKernel(const CMortonTree::STreeNodeSoA treeInfo, TDeviceCollisionResponseSolver solver)
+			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize, size_t kWarpSize = 32, size_t kCacheSize = 32>
+			__global__ void TraverseMortonTreeReflexiveKernel(const CMortonTree::STreeNodeSoA treeInfo, TDeviceCollisionResponseSolver solver)
 			{
+				namespace cg = cooperative_groups;
+
 				const auto leafId = blockIdx.x * blockDim.x + threadIdx.x;
 				if (leafId >= treeInfo.leafs)
 					return;
@@ -18,16 +24,17 @@ namespace wing2d
 				const auto internalCount = treeInfo.leafs - 1;
 				const auto leafBox = treeInfo.boxes[internalCount + leafId];
 
-				TIndex stack[kTreeStackSize];
+				__shared__ TIndex stack[kTreeStackSize][kWarpSize];
+
 				unsigned top = 0;
-				stack[top] = 0;
+				stack[top][threadIdx.x] = 0;
 
 				auto deviceSideSolver = solver.Create();
 				deviceSideSolver.OnPreTraversal(leafId);
 
 				while (top < kTreeStackSize) //top == -1 also covered
 				{
-					auto cur = stack[top--];
+					auto cur = stack[top--][threadIdx.x];
 					if (cur == leafId + internalCount)
 						continue;
 
@@ -42,10 +49,10 @@ namespace wing2d
 						}
 						else
 						{
-							stack[++top] = treeInfo.lefts[cur];
+							stack[++top][threadIdx.x] = treeInfo.lefts[cur];
 							if (top + 1 < kTreeStackSize)
 							{
-								stack[++top] = treeInfo.rights[cur];
+								stack[++top][threadIdx.x] = treeInfo.rights[cur];
 							}
 							else
 							{
@@ -61,10 +68,12 @@ namespace wing2d
 			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize>
 			void CMortonTree::TraverseReflexive(const TDeviceCollisionResponseSolver& solver)
 			{
-				dim3 blockDim(kBlockSize);
-				dim3 gridDim(GridSize(m_tree.leafs, kBlockSize));
+				constexpr size_t kWarpSize = 32;
+				dim3 blockDim(kWarpSize);
+				dim3 gridDim(GridSize(m_tree.leafs, blockDim.x));
 
-				TraverseTreeKernel <TDeviceCollisionResponseSolver, kTreeStackSize> <<<gridDim, blockDim >>> (m_tree.get(m_mortonCodes.sortedCodes), solver);
+				TraverseMortonTreeReflexiveKernel <TDeviceCollisionResponseSolver, kTreeStackSize, kWarpSize> <<<gridDim, blockDim >>> (m_tree.get(m_mortonCodes.sortedCodes), solver);
+				CudaCheckError();
 			}
 		}
 	}
