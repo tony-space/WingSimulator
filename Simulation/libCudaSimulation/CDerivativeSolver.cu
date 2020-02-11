@@ -370,7 +370,7 @@ void CDerivativeSolver::ResetParticlesState()
 
 void CDerivativeSolver::ResolveParticleParticleCollisions()
 {
-	m_particlesTree.TraverseReflexive(SParticleParticleCollisionSolver(m_particles.GetSimState()));
+	m_particlesTree.TraverseReflexive<SParticleParticleCollisionSolver, 24>(SParticleParticleCollisionSolver(m_particles.GetSimState()));
 	CudaCheckError();
 }
 
