@@ -86,17 +86,6 @@ static Segments_t BuildWalls(const SimulationState& state)
 	return result;
 }
 
-static Segments_t BuildAirfoil(const SimulationState& state)
-{
-	Segments_t result;
-
-	for (size_t i = 0; i < state.airfoil.size() - 1; ++i)
-		result.emplace_back(std::make_tuple(TupleToVec(state.airfoil[i]), TupleToVec(state.airfoil[i + 1])));
-	result.emplace_back(std::make_tuple(TupleToVec(state.airfoil.back()), TupleToVec(state.airfoil.front())));
-
-	return result;
-}
-
 std::unique_ptr<ISimulation> wing2d::simulation::cuda::CreateSimulation()
 {
 	return std::make_unique<CSimulationCuda>();
@@ -110,7 +99,7 @@ void CSimulationCuda::ResetState(const SimulationState& state)
 
 	CopyToGPU();
 
-	m_derivativeSolver = std::make_unique<CDerivativeSolver>(m_state.particles, m_state.particleRad, BuildAirfoil(m_state), BuildWalls(m_state));
+	m_derivativeSolver = std::make_unique<CDerivativeSolver>(m_state.particles, m_state.particleRad, Segments_t(), BuildWalls(m_state));
 	m_odeSolver = std::make_unique<CForwardEulerSolver>(m_derivativeSolver.get());
 }
 

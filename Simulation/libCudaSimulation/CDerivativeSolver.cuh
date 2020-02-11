@@ -70,14 +70,11 @@ namespace wing2d
 				} m_particles;
 
 				CMortonTree m_particlesTree;
-				CMortonTree m_airfoilTree;
-
 
 				void BuildParticlesTree(const OdeState_t& curState);
 				void ReorderParticles(const OdeState_t& curState);
 				void ResetParticlesState();
 				void ResolveParticleParticleCollisions();
-				void ResolveParticleWingCollisions();
 				void ParticleToWall();
 				void ApplyGravity();
 				void BuildDerivative(const OdeState_t& curState, OdeState_t& outDerivative);
