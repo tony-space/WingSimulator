@@ -11,7 +11,7 @@ namespace wing2d
 	{
 		namespace cuda
 		{
-			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize, size_t kWarpSize = 32, size_t kCacheSize = 32>
+			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize, size_t kWarpSize = 32>
 			__global__ void TraverseMortonTreeReflexiveKernel(const CMortonTree::STreeNodeSoA treeInfo, TDeviceCollisionResponseSolver solver)
 			{
 				const auto leafId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -41,7 +41,7 @@ namespace wing2d
 					if (!treeInfo.boxes[cur].Overlaps(leafBox))
 						continue;
 					
-					if (cur < internalCount) //if leaf
+					if (cur < internalCount)
 					{
 						stack[++top][threadIdx.x] = treeInfo.lefts[cur];
 						if (top + 1 < kTreeStackSize)
@@ -65,7 +65,67 @@ namespace wing2d
 				dim3 blockDim(kWarpSize);
 				dim3 gridDim(GridSize(m_tree.leafs, blockDim.x));
 
-				TraverseMortonTreeReflexiveKernel <TDeviceCollisionResponseSolver, kTreeStackSize, kWarpSize> <<<gridDim, blockDim >>> (m_tree.get(m_mortonCodes.sortedCodes), solver);
+				TraverseMortonTreeReflexiveKernel <TDeviceCollisionResponseSolver, kTreeStackSize, kWarpSize> <<<gridDim, blockDim >>> (
+					m_tree.get(m_mortonCodes.sortedCodes),
+					solver);
+				CudaCheckError();
+			}
+
+			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize, size_t kWarpSize = 32>
+			__global__ void TraverseMortonTreeKernel(const CMortonTree::STreeNodeSoA treeInfo, const SBoundingBoxesAoS externalObjects, TDeviceCollisionResponseSolver solver)
+			{
+				const auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+				if (threadId >= externalObjects.count)
+					return;
+
+				const auto objectBox = externalObjects.boxes[threadId];
+				const auto internalCount = treeInfo.leafs - 1;
+
+				__shared__ TIndex stack[kTreeStackSize][kWarpSize];
+
+				unsigned top = 0;
+				stack[top][threadIdx.x] = 0;
+
+				auto deviceSideSolver = solver.Create();
+				deviceSideSolver.OnPreTraversal(threadId);
+
+				while (top < kTreeStackSize) //top == -1 also covered
+				{
+					auto cur = stack[top--][threadIdx.x];
+
+					if (!treeInfo.boxes[cur].Overlaps(objectBox))
+						continue;
+
+					if (cur < internalCount)
+					{
+						stack[++top][threadIdx.x] = treeInfo.lefts[cur];
+						if (top + 1 < kTreeStackSize)
+							stack[++top][threadIdx.x] = treeInfo.rights[cur];
+						else
+							printf("stack size exceeded\n");
+
+						continue;
+					}
+
+					deviceSideSolver.OnCollisionDetected(cur - internalCount);
+				}
+
+				deviceSideSolver.OnPostTraversal();
+			}
+
+			template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize>
+			void CMortonTree::Traverse(const thrust::device_vector<SBoundingBox>& objects, const TDeviceCollisionResponseSolver& solver)
+			{
+				constexpr size_t kWarpSize = 32;
+				dim3 blockDim(kWarpSize);
+				dim3 gridDim(GridSize(objects.size(), blockDim.x));
+
+				const auto boxes = SBoundingBoxesAoS::Create(objects);
+
+				TraverseMortonTreeKernel <TDeviceCollisionResponseSolver, kTreeStackSize, kWarpSize> <<<gridDim, blockDim >>> (
+					m_tree.get(m_mortonCodes.sortedCodes),
+					boxes,
+					solver);
 				CudaCheckError();
 			}
 		}

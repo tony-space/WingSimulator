@@ -34,23 +34,19 @@ namespace wing2d
 					__device__ size_t FindUpperBound(size_t i, ptrdiff_t d, ptrdiff_t dMin) const;
 					__device__ void ProcessInternalNode(size_t i);
 					__device__ void BottomToTopInitialization(size_t leafId);
-					__device__ void Traverse(const SBoundingBox& box, TIndex* sharedMem, size_t maxCollisionsPerElement, size_t reflexiveIdx) const;
 				};
 
-				struct SDeviceCollisions
-				{
-					const size_t elements;
-					const size_t maxCollisionsPerElement;
-					TIndex* __restrict__ internalIndices;
-				};
 
 				void Build(const thrust::device_vector<SBoundingBox>& leafs);
-				const SDeviceCollisions Traverse(const thrust::device_vector<SBoundingBox>& objects, size_t maxCollisionsPerElement = 32);
 				const thrust::device_vector<TIndex>& GetSortedIndices() const;
 				const thrust::device_vector<SBoundingBox>& GetSortedBoxes() const;
 
 				template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize = 32>
 				void TraverseReflexive(const TDeviceCollisionResponseSolver& solver);
+
+				template<typename TDeviceCollisionResponseSolver, size_t kTreeStackSize = 32>
+				void Traverse(const thrust::device_vector<SBoundingBox>& objects, const TDeviceCollisionResponseSolver& solver);
+
 			private:
 				struct
 				{
