@@ -149,6 +149,8 @@ __device__ void CMortonTree::STreeNodeSoA::BottomToTopInitialization(size_t leaf
 
 		cur = parent;
 		curBox = parentBox;
+
+		__threadfence();
 	}
 }
 
