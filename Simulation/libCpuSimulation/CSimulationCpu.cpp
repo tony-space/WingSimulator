@@ -70,8 +70,8 @@ float CSimulationCpu::ComputeMinDeltaTime(float requestedDt) const
 	}, [&](const auto& v)
 	{
 		auto vel = glm::length(v);
-		auto halfRadDt = rad / vel;
-		return std::min(halfRadDt, requestedDt);
+		auto radDt = rad / vel;
+		return radDt;
 	});
 }
 

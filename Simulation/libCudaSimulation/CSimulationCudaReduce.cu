@@ -17,9 +17,9 @@ static __global__ void ComputeMinTimesKernel(const float2* __restrict__ velociti
 		return;
 
 	auto vel = length(velocities[threadId]);
-	auto halfRadDt = rad / vel;
+	auto radDt = rad / vel;
 
-	outTimes[threadId] = fminf(halfRadDt, requestedDt);
+	outTimes[threadId] = fminf(radDt, requestedDt);
 }
 
 const thrust::device_ptr<float>& CSimulationCuda::ComputeMinDeltaTime(float requestedDt)
