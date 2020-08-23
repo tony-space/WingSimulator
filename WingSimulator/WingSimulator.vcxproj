@@ -130,6 +130,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
+      <DelayLoadDLLs>libOpenGLRenderer.dll;libCpuSimulation.dll;libCudaSimulation.dll;libOpenCLSimulation.dll</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -176,6 +177,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
+      <DelayLoadDLLs>libOpenGLRenderer.dll;libCpuSimulation.dll;libCudaSimulation.dll;libOpenCLSimulation.dll</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
