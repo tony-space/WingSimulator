@@ -7,7 +7,7 @@ https://www.youtube.com/playlist?list=PLwr8DnSlIMg0KABru36pg4CvbfkhBofAi
 
 ## Toolset to build
 
-Visual Studio 2019 Community Edition, CUDA 10.2
+Visual Studio 2019 Community Edition, CUDA 11.0.
 
 ## Introduction
 
